@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from fuga_memory.db.repository import MemoryRepository
+from fuga_memory.search.vector import search_vector
 
 
 class TestSearchVector:
@@ -37,7 +38,6 @@ class TestSearchVector:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """記憶が存在する場合に結果が返ること。"""
-        from fuga_memory.search.vector import search_vector
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         query_vec = self._make_query_vec()
@@ -50,7 +50,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """結果の辞書に必須フィールドが含まれること。"""
-        from fuga_memory.search.vector import search_vector
 
         repo = MemoryRepository(initialized_db, mock_encoder)
         repo.save("テスト", "session-001")
@@ -71,7 +70,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """embedding_dim と query_vec の長さが異なる場合に ValueError が発生すること。"""
-        from fuga_memory.search.vector import search_vector
 
         wrong_dim_vec = [0.1] * 100  # 768 ではなく 100 次元
         with pytest.raises(ValueError):
@@ -84,7 +82,6 @@ class TestSearchVector:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """top_k が結果数の上限として機能すること。"""
-        from fuga_memory.search.vector import search_vector
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         query_vec = self._make_query_vec()
@@ -97,7 +94,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """戻り値が list であること。"""
-        from fuga_memory.search.vector import search_vector
 
         query_vec = self._make_query_vec()
         results = search_vector(initialized_db, query_vec)
@@ -109,7 +105,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """DBが空の場合は空リストを返すこと。"""
-        from fuga_memory.search.vector import search_vector
 
         query_vec = self._make_query_vec()
         results = search_vector(initialized_db, query_vec, top_k=5)
@@ -124,7 +119,6 @@ class TestSearchVector:
         top_k: int,
     ) -> None:
         """様々な top_k の値で結果数が制限されること。"""
-        from fuga_memory.search.vector import search_vector
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         query_vec = self._make_query_vec()
@@ -137,7 +131,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """embedding_dim のデフォルトは 768 で、768次元ベクトルが受け入れられること。"""
-        from fuga_memory.search.vector import search_vector
 
         vec_768 = self._make_query_vec(dim=768)
         # デフォルト embedding_dim=768 で例外が発生しないこと
@@ -150,7 +143,6 @@ class TestSearchVector:
         mock_encoder: MagicMock,
     ) -> None:
         """カスタム embedding_dim と長さが合わない場合も ValueError が発生すること。"""
-        from fuga_memory.search.vector import search_vector
 
         # embedding_dim=256 なのに 512 次元を渡す
         wrong_vec = self._make_query_vec(dim=512)

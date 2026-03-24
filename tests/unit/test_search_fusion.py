@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from fuga_memory.search.fusion import reciprocal_rank_fusion
+
 
 def _make_created_at(days_ago: float = 0) -> str:
     """指定日数前の ISO8601 文字列を生成する。"""
@@ -42,21 +44,18 @@ class TestReciprocalRankFusion:
 
     def test_returns_list(self) -> None:
         """戻り値が list であること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         result = reciprocal_rank_fusion([], [])
         assert isinstance(result, list)
 
     def test_empty_inputs_return_empty(self) -> None:
         """両方が空リストの場合は空リストを返すこと。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         result = reciprocal_rank_fusion([], [])
         assert result == []
 
     def test_fts_only_returns_results(self) -> None:
         """FTS 結果のみで fusion が動作すること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         fts = [self._make_fts_result(1), self._make_fts_result(2)]
         result = reciprocal_rank_fusion(fts, [])
@@ -64,7 +63,6 @@ class TestReciprocalRankFusion:
 
     def test_vec_only_returns_results(self) -> None:
         """ベクトル結果のみで fusion が動作すること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         vec = [self._make_vec_result(1), self._make_vec_result(2)]
         result = reciprocal_rank_fusion([], vec)
@@ -72,7 +70,6 @@ class TestReciprocalRankFusion:
 
     def test_result_has_required_fields(self) -> None:
         """結果の辞書に必須フィールドが含まれること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         fts = [self._make_fts_result(1, "テスト内容")]
         result = reciprocal_rank_fusion(fts, [])
@@ -87,7 +84,6 @@ class TestReciprocalRankFusion:
 
     def test_sorted_by_score_descending(self) -> None:
         """結果が score の降順でソートされていること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         fts = [
             self._make_fts_result(1),
@@ -101,7 +97,6 @@ class TestReciprocalRankFusion:
 
     def test_same_id_scores_are_summed(self) -> None:
         """同じ ID が両リストに現れる場合はスコアが合算されること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         shared_id = 42
         fts = [self._make_fts_result(shared_id, "共通コンテンツ", days_ago=0.1)]
@@ -123,7 +118,6 @@ class TestReciprocalRankFusion:
 
     def test_time_decay_reduces_old_content_score(self) -> None:
         """古いコンテンツは新しいコンテンツよりスコアが低いこと。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         # 同じ順位（1位）で、一方は1日前、もう一方は300日前
         fts_new = [self._make_fts_result(1, "新しい内容", days_ago=1)]
@@ -136,7 +130,6 @@ class TestReciprocalRankFusion:
 
     def test_k_parameter_affects_score(self) -> None:
         """k パラメータを変えるとスコアが変わること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         fts = [self._make_fts_result(1)]
         result_k60 = reciprocal_rank_fusion(fts, [], k=60)
@@ -148,7 +141,6 @@ class TestReciprocalRankFusion:
 
     def test_score_formula_rrf(self) -> None:
         """RRF スコア計算が正しいこと: score = 1/(k+rank) * decay。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         # 既知の値で計算を検証
         # 1件のみ、FTS の 1位（0-based index 0）、k=60
@@ -162,7 +154,6 @@ class TestReciprocalRankFusion:
 
     def test_multiple_ids_no_duplicate(self) -> None:
         """複数のユニークな ID がある場合、結果に重複がないこと。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         fts = [self._make_fts_result(i) for i in range(1, 4)]
         vec = [self._make_vec_result(i) for i in range(3, 6)]
@@ -173,7 +164,6 @@ class TestReciprocalRankFusion:
 
     def test_halflife_days_parameter(self) -> None:
         """halflife_days パラメータが decay に影響すること。"""
-        from fuga_memory.search.fusion import reciprocal_rank_fusion
 
         # 10日前のコンテンツ
         fts = [self._make_fts_result(1, days_ago=10)]
