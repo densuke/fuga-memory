@@ -37,31 +37,19 @@ def reciprocal_rank_fusion(
     meta: dict[int, dict[str, Any]] = {}
     rrf_scores: dict[int, float] = {}
 
-    # FTS 結果を処理（0-based rank）
-    for rank, item in enumerate(fts_results):
-        item_id = int(item["id"])
-        rrf_scores[item_id] = rrf_scores.get(item_id, 0.0) + 1.0 / (k + rank + 1)
-        if item_id not in meta:
-            meta[item_id] = {
-                "id": item_id,
-                "content": item["content"],
-                "session_id": item["session_id"],
-                "source": item["source"],
-                "created_at": item["created_at"],
-            }
-
-    # ベクトル結果を処理（0-based rank）
-    for rank, item in enumerate(vec_results):
-        item_id = int(item["id"])
-        rrf_scores[item_id] = rrf_scores.get(item_id, 0.0) + 1.0 / (k + rank + 1)
-        if item_id not in meta:
-            meta[item_id] = {
-                "id": item_id,
-                "content": item["content"],
-                "session_id": item["session_id"],
-                "source": item["source"],
-                "created_at": item["created_at"],
-            }
+    # FTS・ベクトル結果をまとめて処理（0-based rank）
+    for results_list in (fts_results, vec_results):
+        for rank, item in enumerate(results_list):
+            item_id = int(item["id"])
+            rrf_scores[item_id] = rrf_scores.get(item_id, 0.0) + 1.0 / (k + rank + 1)
+            if item_id not in meta:
+                meta[item_id] = {
+                    "id": item_id,
+                    "content": item["content"],
+                    "session_id": item["session_id"],
+                    "source": item["source"],
+                    "created_at": item["created_at"],
+                }
 
     # 時間減衰を適用してスコアを確定
     results: list[dict[str, Any]] = []

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from fuga_memory.db.repository import MemoryRepository
+from fuga_memory.search.fts import search_fts
 
 
 class TestSearchFts:
@@ -32,7 +33,6 @@ class TestSearchFts:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """マッチするキーワードで結果が返ること。"""
-        from fuga_memory.search.fts import search_fts
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         results = search_fts(initialized_db, "Rust", top_k=5)
@@ -45,7 +45,6 @@ class TestSearchFts:
         mock_encoder: MagicMock,
     ) -> None:
         """マッチしないキーワードでは空リストを返すこと。"""
-        from fuga_memory.search.fts import search_fts
 
         repo = MemoryRepository(initialized_db, mock_encoder)
         repo.save("Python の話", "session-001")
@@ -59,7 +58,6 @@ class TestSearchFts:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """top_k が結果数の上限として機能すること。"""
-        from fuga_memory.search.fts import search_fts
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         results = search_fts(initialized_db, "の", top_k=2)
@@ -71,7 +69,6 @@ class TestSearchFts:
         mock_encoder: MagicMock,
     ) -> None:
         """結果の辞書に必須フィールドが含まれること。"""
-        from fuga_memory.search.fts import search_fts
 
         repo = MemoryRepository(initialized_db, mock_encoder)
         repo.save("SQLiteのFTS5を使う", "session-001")
@@ -92,7 +89,6 @@ class TestSearchFts:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """結果が rank の昇順でソートされていること（FTS5のrank は負値で小さい方が高関連度）。"""
-        from fuga_memory.search.fts import search_fts
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         results = search_fts(initialized_db, "の", top_k=5)
@@ -106,7 +102,6 @@ class TestSearchFts:
         mock_encoder: MagicMock,
     ) -> None:
         """戻り値が list であること。"""
-        from fuga_memory.search.fts import search_fts
 
         results = search_fts(initialized_db, "テスト", top_k=5)
         assert isinstance(results, list)
@@ -118,7 +113,6 @@ class TestSearchFts:
         sample_memories: list[dict[str, Any]],
     ) -> None:
         """top_k のデフォルト値が 5 であること（5件以下の結果）。"""
-        from fuga_memory.search.fts import search_fts
 
         # 6件以上のデータを投入
         repo = MemoryRepository(initialized_db, mock_encoder)
@@ -137,7 +131,6 @@ class TestSearchFts:
         top_k: int,
     ) -> None:
         """様々な top_k の値で結果数が制限されること。"""
-        from fuga_memory.search.fts import search_fts
 
         self._populate(initialized_db, mock_encoder, sample_memories)
         results = search_fts(initialized_db, "の", top_k=top_k)
