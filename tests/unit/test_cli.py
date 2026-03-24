@@ -9,6 +9,7 @@ from __future__ import annotations
 import gc
 import sqlite3
 from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -252,10 +253,87 @@ class TestSaveCommand:
         assert result.exit_code != 0
 
     def test_save_content_is_required(self, runner: CliRunner) -> None:
-        """save コマンドはコンテンツ引数が必須。"""
+        """save コマンドはコンテンツ引数が必須（--stdin / --file なしの場合）。"""
         from fuga_memory.cli import main
 
         result = runner.invoke(main, ["save", "--session-id", "session-001"])
+        assert result.exit_code != 0
+
+    def test_save_from_stdin(
+        self,
+        runner: CliRunner,
+        in_memory_conn: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """--stdin フラグで標準入力からコンテンツを読み込める。"""
+        import fuga_memory.server as srv
+
+        srv._conn = in_memory_conn  # type: ignore[attr-defined]
+        srv._encoder = mock_encoder  # type: ignore[attr-defined]
+
+        from fuga_memory.cli import main
+
+        result = runner.invoke(
+            main,
+            ["save", "--session-id", "session-stdin", "--stdin"],
+            input="標準入力からのテスト記憶",
+        )
+        assert result.exit_code == 0
+        row = in_memory_conn.execute("SELECT content FROM memories").fetchone()
+        assert row["content"] == "標準入力からのテスト記憶"
+
+    def test_save_from_file(
+        self,
+        tmp_path: Path,
+        runner: CliRunner,
+        in_memory_conn: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """--file オプションでファイルからコンテンツを読み込める。"""
+        import fuga_memory.server as srv
+
+        srv._conn = in_memory_conn  # type: ignore[attr-defined]
+        srv._encoder = mock_encoder  # type: ignore[attr-defined]
+
+        content_file = tmp_path / "memory.txt"
+        content_file.write_text("ファイルからのテスト記憶")
+
+        from fuga_memory.cli import main
+
+        result = runner.invoke(
+            main,
+            ["save", "--session-id", "session-file", "--file", str(content_file)],
+        )
+        assert result.exit_code == 0
+        row = in_memory_conn.execute("SELECT content FROM memories").fetchone()
+        assert row["content"] == "ファイルからのテスト記憶"
+
+    def test_save_stdin_and_arg_conflict(self, runner: CliRunner) -> None:
+        """content 引数と --stdin を同時に指定するとエラー。"""
+        from fuga_memory.cli import main
+
+        result = runner.invoke(
+            main,
+            ["save", "--session-id", "s1", "--stdin", "コンテンツ"],
+            input="stdin入力",
+        )
+        assert result.exit_code != 0
+
+    def test_save_stdin_and_file_conflict(
+        self,
+        tmp_path: Path,
+        runner: CliRunner,
+    ) -> None:
+        """--stdin と --file を同時に指定するとエラー。"""
+        from fuga_memory.cli import main
+
+        content_file = tmp_path / "f.txt"
+        content_file.write_text("test")
+        result = runner.invoke(
+            main,
+            ["save", "--session-id", "s1", "--stdin", "--file", str(content_file)],
+            input="stdin",
+        )
         assert result.exit_code != 0
 
     def test_save_outputs_confirmation(

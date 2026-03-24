@@ -3,10 +3,13 @@
 コマンド:
   serve  - MCP サーバーを起動する（stdio transport）
   search - 記憶を検索して結果を表示する
-  save   - 記憶を保存する
+  save   - 記憶を保存する（引数・--stdin・--file の3方式）
 """
 
 from __future__ import annotations
+
+import sys
+from pathlib import Path
 
 import click
 
@@ -49,7 +52,7 @@ def search(query: str, top_k: int) -> None:
 
 
 @main.command()
-@click.argument("content")
+@click.argument("content", required=False)
 @click.option("--session-id", required=True, help="セッション識別子。")
 @click.option(
     "--source",
@@ -57,7 +60,47 @@ def search(query: str, top_k: int) -> None:
     show_default=True,
     help="記憶のソース。",
 )
-def save(content: str, session_id: str, source: str) -> None:
-    """記憶を保存する。"""
-    result = _server.save_memory(content, session_id=session_id, source=source)
+@click.option(
+    "--stdin",
+    "read_stdin",
+    is_flag=True,
+    help="標準入力からコンテンツを読む（Stop フック等で使用）。",
+)
+@click.option(
+    "--file",
+    "file_path",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="ファイルからコンテンツを読む。",
+)
+def save(
+    content: str | None,
+    session_id: str,
+    source: str,
+    read_stdin: bool,
+    file_path: Path | None,
+) -> None:
+    """記憶を保存する。
+
+    コンテンツの指定方法（いずれか1つ）:
+
+    \b
+      fuga-memory save "内容" --session-id <id>
+      fuga-memory save --stdin --session-id <id>   # パイプ入力
+      fuga-memory save --file memo.txt --session-id <id>
+    """
+    input_count = sum([content is not None, read_stdin, file_path is not None])
+    if input_count > 1:
+        raise click.UsageError("content 引数、--stdin、--file は同時に指定できません。")
+    if input_count == 0:
+        raise click.UsageError("content 引数、--stdin、--file のいずれかを指定してください。")
+
+    if read_stdin:
+        body = sys.stdin.read()
+    elif file_path is not None:
+        body = file_path.read_text()
+    else:
+        body = str(content)
+
+    result = _server.save_memory(body, session_id=session_id, source=source)
     click.echo(f"保存しました: id={result['id']}  status={result['status']}")
