@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# pre-commit: ruff format/lint + mypy のチェック
+
+set -euo pipefail
+
+# ステージング済みコードのみ対象にするため、未ステージ変更を一時退避
+STASHED=0
+if ! git diff --quiet; then
+    git stash push --quiet --keep-index
+    STASHED=1
+fi
+
+RESULT=0
+
+echo ">>> ruff format check..."
+if ! uv run ruff format --check src/ tests/; then
+    echo "    [FAIL] ruff format: 'uv run ruff format src/ tests/' で修正してください"
+    RESULT=1
+fi
+
+echo ">>> ruff lint check..."
+if ! uv run ruff check src/ tests/; then
+    echo "    [FAIL] ruff check: 'uv run ruff check --fix src/ tests/' で修正してください"
+    RESULT=1
+fi
+
+echo ">>> mypy type check..."
+if ! uv run mypy src/; then
+    echo "    [FAIL] mypy: 型エラーを修正してください"
+    RESULT=1
+fi
+
+# 退避したコードを戻す
+if [ "$STASHED" -eq 1 ]; then
+    git stash pop --quiet
+fi
+
+if [ "$RESULT" -ne 0 ]; then
+    echo ""
+    echo "pre-commit チェック失敗。上記のエラーを修正してから再コミットしてください。"
+    exit 1
+fi
+
+echo ">>> すべてのチェックが通りました。"
