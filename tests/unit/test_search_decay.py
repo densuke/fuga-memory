@@ -75,3 +75,19 @@ class TestTimeDecay:
         score = time_decay(now_str)
         # 経過時間が1秒未満なので 1.0 に極めて近い
         assert score > 0.999
+
+    def test_zero_halflife_raises_value_error(self) -> None:
+        """halflife_days=0 は ValueError を発生させること。"""
+        import pytest
+
+        now_str = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with pytest.raises(ValueError, match="halflife_days"):
+            time_decay(now_str, halflife_days=0)
+
+    def test_negative_halflife_raises_value_error(self) -> None:
+        """halflife_days が負の場合も ValueError を発生させること。"""
+        import pytest
+
+        now_str = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with pytest.raises(ValueError, match="halflife_days"):
+            time_decay(now_str, halflife_days=-1)

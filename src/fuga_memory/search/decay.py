@@ -22,6 +22,9 @@ def time_decay(created_at: str, halflife_days: int = 30) -> float:
     now = datetime.now(tz=UTC)
     age_seconds = (now - dt).total_seconds()
 
+    if halflife_days <= 0:
+        raise ValueError(f"halflife_days は 1 以上である必要があります: {halflife_days}")
+
     if age_seconds <= 0:
         return 1.0
 
