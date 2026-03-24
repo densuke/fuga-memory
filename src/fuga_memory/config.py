@@ -93,6 +93,17 @@ def _apply_toml(config: Config, path: Path) -> Config:
     return replace(config, **updates)
 
 
+def _parse_env_int(updates: dict[str, Any], var_name: str, field_name: str) -> None:
+    """環境変数を整数として読み込み updates に追加する。未設定時は何もしない。"""
+    if val_str := os.environ.get(var_name):
+        try:
+            updates[field_name] = int(val_str)
+        except ValueError as exc:
+            raise ValueError(
+                f"{var_name} に無効な値が設定されています: {val_str!r} (整数を指定してください)"
+            ) from exc
+
+
 def _apply_env(config: Config) -> Config:
     """環境変数の値を Config に適用して新しい Config を返す。"""
     updates: dict[str, Any] = {}
@@ -103,41 +114,10 @@ def _apply_env(config: Config) -> Config:
     if model_name_env := os.environ.get("FUGA_MEMORY_MODEL_NAME"):
         updates["model_name"] = model_name_env
 
-    if workers_str := os.environ.get("FUGA_MEMORY_THREAD_WORKERS"):
-        try:
-            updates["thread_workers"] = int(workers_str)
-        except ValueError as exc:
-            raise ValueError(
-                f"FUGA_MEMORY_THREAD_WORKERS に無効な値が設定されています: {workers_str!r}"
-                " (整数を指定してください)"
-            ) from exc
-
-    if rrf_k_str := os.environ.get("FUGA_MEMORY_RRF_K"):
-        try:
-            updates["rrf_k"] = int(rrf_k_str)
-        except ValueError as exc:
-            raise ValueError(
-                f"FUGA_MEMORY_RRF_K に無効な値が設定されています: {rrf_k_str!r}"
-                " (整数を指定してください)"
-            ) from exc
-
-    if halflife_str := os.environ.get("FUGA_MEMORY_DECAY_HALFLIFE_DAYS"):
-        try:
-            updates["decay_halflife_days"] = int(halflife_str)
-        except ValueError as exc:
-            raise ValueError(
-                f"FUGA_MEMORY_DECAY_HALFLIFE_DAYS に無効な値が設定されています: {halflife_str!r}"
-                " (整数を指定してください)"
-            ) from exc
-
-    if top_k_str := os.environ.get("FUGA_MEMORY_DEFAULT_TOP_K"):
-        try:
-            updates["default_top_k"] = int(top_k_str)
-        except ValueError as exc:
-            raise ValueError(
-                f"FUGA_MEMORY_DEFAULT_TOP_K に無効な値が設定されています: {top_k_str!r}"
-                " (整数を指定してください)"
-            ) from exc
+    _parse_env_int(updates, "FUGA_MEMORY_THREAD_WORKERS", "thread_workers")
+    _parse_env_int(updates, "FUGA_MEMORY_RRF_K", "rrf_k")
+    _parse_env_int(updates, "FUGA_MEMORY_DECAY_HALFLIFE_DAYS", "decay_halflife_days")
+    _parse_env_int(updates, "FUGA_MEMORY_DEFAULT_TOP_K", "default_top_k")
 
     return replace(config, **updates)
 

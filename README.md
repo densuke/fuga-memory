@@ -43,22 +43,9 @@ cp config.toml.example ~/.config/fuga-memory/config.toml
 
 ### 3. Claude Code に登録
 
-`~/.claude/settings.json` を開き、`mcpServers` に追加します（`/path/to/fuga-memory` は実際のパスに変更してください）。
+`~/.claude/settings.json` を開き、以下を追加します（`/path/to/fuga-memory` は実際のパスに変更してください）。
 
-```json
-{
-  "mcpServers": {
-    "fuga-memory": {
-      "command": "uv",
-      "args": ["run", "--project", "/path/to/fuga-memory", "fuga-memory", "serve"]
-    }
-  }
-}
-```
-
-### 4. Stop フックで自動保存（任意）
-
-セッション終了時に会話内容を自動保存するには `hooks` セクションも追加します。
+Stop フックによる自動保存も使う場合は `hooks` セクションをそのまま含めてください。使わない場合は `hooks` セクションを削除してください。
 
 ```json
 {
@@ -84,7 +71,7 @@ cp config.toml.example ~/.config/fuga-memory/config.toml
 }
 ```
 
-### 5. 動作確認
+### 4. 動作確認
 
 Claude Code を再起動すると MCP ツールが有効になります。Claude に話しかけてみてください。
 
