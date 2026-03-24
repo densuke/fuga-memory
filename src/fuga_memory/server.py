@@ -1,6 +1,6 @@
 """fastmcp を使った MCP サーバー定義。
 
-グローバルな接続・エンコーダを遅延初期化し、MCP ツール関数から参照する。
+グローバルな接続・エンコーダ・設定を遅延初期化し、MCP ツール関数から参照する。
 テストでは _conn / _encoder を直接差し替えてインメモリ DB・モックを注入できる。
 """
 
@@ -29,13 +29,22 @@ mcp: FastMCP = FastMCP("fuga-memory")
 
 _conn: sqlite3.Connection | None = None
 _encoder: Encoder | None = None
+_config: Config | None = None
+
+
+def _get_config() -> Config:
+    """グローバル Config を返す。未初期化なら Config.from_env() で初期化する。"""
+    global _config
+    if _config is None:
+        _config = Config.from_env()
+    return _config
 
 
 def _get_conn() -> sqlite3.Connection:
-    """グローバル DB 接続を返す。未初期化なら Config.from_env() で初期化する。"""
+    """グローバル DB 接続を返す。未初期化なら Config で初期化する。"""
     global _conn
     if _conn is None:
-        config = Config.from_env()
+        config = _get_config()
         _conn = get_connection(config.db_path)
         initialize_schema(_conn, config.embedding_dim)
     return _conn
@@ -45,7 +54,7 @@ def _get_encoder() -> Encoder:
     """グローバルエンコーダを返す。未初期化なら ModelLoader で初期化する。"""
     global _encoder
     if _encoder is None:
-        config = Config.from_env()
+        config = _get_config()
         loader = ModelLoader(config.model_name, config.thread_workers)
         _encoder = loader.get_encoder()
     return _encoder
@@ -70,7 +79,7 @@ def save_memory(content: str, session_id: str, source: str = "manual") -> dict[s
     """
     conn = _get_conn()
     encoder = _get_encoder()
-    config = Config.from_env()
+    config = _get_config()
     repo = MemoryRepository(conn, encoder, config.embedding_dim)
     memory_id = repo.save(content, session_id, source)
     return {"id": memory_id, "status": "saved"}
@@ -82,15 +91,20 @@ def search_memory(query: str, top_k: int = 5) -> list[dict[str, Any]]:
 
     Args:
         query: 検索クエリ文字列。
-        top_k: 返す最大件数（デフォルト: 5）。
+        top_k: 返す最大件数（デフォルト: 5、1 以上）。
 
     Returns:
         [{"id", "score", "content", "session_id", "source", "created_at"}, ...]
         score の降順でソート済み。
+
+    Raises:
+        ValueError: top_k が 1 未満の場合。
     """
+    if top_k < 1:
+        raise ValueError(f"top_k は 1 以上である必要があります: {top_k}")
     conn = _get_conn()
     encoder = _get_encoder()
-    config = Config.from_env()
+    config = _get_config()
 
     query_vec = encoder.encode(query)
     fts_results = search_fts(conn, query, top_k=top_k)
@@ -108,14 +122,30 @@ def search_memory(query: str, top_k: int = 5) -> list[dict[str, Any]]:
 def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
     """セッション一覧を返す（直近更新順）。
 
+    エンコーダ不要の読み取り専用操作のため、モデルの初期化を発生させない。
+
     Args:
-        limit: 返す最大件数（デフォルト: 20）。
+        limit: 返す最大件数（デフォルト: 20、1 以上）。
 
     Returns:
         [{"session_id", "memory_count", "last_updated"}, ...]
+
+    Raises:
+        ValueError: limit が 1 未満の場合。
     """
+    if limit < 1:
+        raise ValueError(f"limit は 1 以上である必要があります: {limit}")
     conn = _get_conn()
-    encoder = _get_encoder()
-    config = Config.from_env()
-    repo = MemoryRepository(conn, encoder, config.embedding_dim)
-    return repo.list_sessions(limit=limit)
+    cur = conn.execute(
+        """
+        SELECT session_id,
+               COUNT(*)        AS memory_count,
+               MAX(created_at) AS last_updated
+        FROM memories
+        GROUP BY session_id
+        ORDER BY last_updated DESC, MAX(id) DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    return [dict(row) for row in cur.fetchall()]

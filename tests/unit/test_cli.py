@@ -63,6 +63,7 @@ def _reset_server_globals() -> Generator[None]:
 
     srv._conn = None  # type: ignore[attr-defined]
     srv._encoder = None  # type: ignore[attr-defined]
+    srv._config = None  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +152,7 @@ class TestSearchCommand:
 
         result = runner.invoke(main, ["search", "全くマッチしないクエリXYZ"])
         assert result.exit_code == 0
-        # 「0件」や「見つかりません」などのメッセージが含まれる（実装依存）
-        # 最低限、正常終了することを確認する
+        assert "記憶が見つかりませんでした。" in result.output
 
     def test_search_query_is_required(self, runner: CliRunner) -> None:
         """search コマンドはクエリ引数が必須。"""

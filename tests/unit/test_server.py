@@ -66,6 +66,7 @@ def server_deps(
     # テスト後にサーバーグローバルをリセットして参照を解放
     srv._conn = None  # type: ignore[attr-defined]
     srv._encoder = None  # type: ignore[attr-defined]
+    srv._config = None  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -218,11 +219,10 @@ class TestSearchMemory:
         self,
         server_deps: dict[str, Any],
     ) -> None:
-        """マッチしないクエリは空リストを返す（ベクトルのみがヒットする場合でも score 順）。"""
+        """DB が空のとき、search_memory は空リストを返す。"""
         srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-        # DB が空の場合
         results = srv.search_memory("全くマッチしないクエリXYZ")
-        assert isinstance(results, list)
+        assert results == []
 
     def test_search_score_is_float(
         self,
@@ -331,12 +331,22 @@ class TestListSessions:
         self,
         server_deps: dict[str, Any],
     ) -> None:
-        """セッション一覧は last_updated の降順で返る。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
+        """セッション一覧は last_updated の降順（同値時は id 降順）で返る。"""
+        conn = server_deps["conn"]
+        srv = _make_patched_server(conn, server_deps["encoder"])
         srv.save_memory("古い記憶", "session-old", "manual")
         srv.save_memory("新しい記憶", "session-new", "manual")
 
+        # created_at は秒精度のため同一秒になり得る。順序を確定させるため明示的に更新する。
+        conn.execute(
+            "UPDATE memories SET created_at='2020-01-01T00:00:01Z' WHERE session_id='session-old'"
+        )
+        conn.execute(
+            "UPDATE memories SET created_at='2020-01-01T00:00:02Z' WHERE session_id='session-new'"
+        )
+        conn.commit()
+
         sessions = srv.list_sessions()
         assert len(sessions) >= 2
-        # 最新が先頭
         assert sessions[0]["last_updated"] >= sessions[1]["last_updated"]
+        assert sessions[0]["session_id"] == "session-new"
