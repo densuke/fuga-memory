@@ -22,7 +22,7 @@ def tmp_db_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def initialized_db(tmp_db_path: Path) -> Generator[sqlite3.Connection, None, None]:
+def initialized_db(tmp_db_path: Path) -> Generator[sqlite3.Connection]:
     """スキーマ初期化済みのDB接続を返す。テスト終了時にクローズ。"""
     conn = get_connection(tmp_db_path)
     initialize_schema(conn)
