@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import sqlite3
 from collections.abc import Generator
 from pathlib import Path
@@ -27,7 +28,9 @@ def initialized_db(tmp_db_path: Path) -> Generator[sqlite3.Connection]:
     conn = get_connection(tmp_db_path)
     initialize_schema(conn)
     yield conn
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.close()
+    gc.collect()  # Python 3.13 でのGC遅延による ResourceWarning を防ぐ
 
 
 @pytest.fixture
