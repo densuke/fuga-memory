@@ -33,10 +33,10 @@ _config: Config | None = None
 
 
 def _get_config() -> Config:
-    """グローバル Config を返す。未初期化なら Config.from_env() で初期化する。"""
+    """グローバル Config を返す。未初期化なら Config.load() で初期化する。"""
     global _config
     if _config is None:
-        _config = Config.from_env()
+        _config = Config.load()
     return _config
 
 

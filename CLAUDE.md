@@ -114,6 +114,20 @@ tests/
 }
 ```
 
+## 設定ファイル
+
+`config_file_paths()` が以下の順で探索し、最初に見つかったものを使用する:
+
+| 優先度 | パス |
+|--------|------|
+| 1（macOS） | `~/Library/Application Support/fuga-memory/config.toml` |
+| 2 | `$XDG_CONFIG_HOME/fuga-memory/config.toml`（未設定時は `~/.config/fuga-memory/config.toml`） |
+| 3 | `~/.fuga-memory.toml` |
+
+読み込み優先順位: デフォルト値 < 設定ファイル < 環境変数
+
+テンプレートは `config.toml.example` および `.env.example` を参照。
+
 ## 設計メモ
 
 - **埋め込み次元**: 768（ruri-v3-310m）
