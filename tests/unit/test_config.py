@@ -211,6 +211,7 @@ class TestConfigEnvOverride:
         for key in (
             "FUGA_MEMORY_DB_PATH",
             "FUGA_MEMORY_MODEL_NAME",
+            "FUGA_MEMORY_THREAD_WORKERS",
             "FUGA_MEMORY_RRF_K",
             "FUGA_MEMORY_DECAY_HALFLIFE_DAYS",
             "FUGA_MEMORY_DEFAULT_TOP_K",
@@ -221,14 +222,28 @@ class TestConfigEnvOverride:
         assert config.rrf_k == 60
 
 
-class TestConfigFromEnvBackcompat:
-    """from_env() が load() の後方互換エイリアスであることを確認。"""
+class TestConfigFromEnv:
+    """from_env() が環境変数のみを適用し、設定ファイルを読まないことを確認。"""
 
     def test_from_env_returns_config(self) -> None:
         config = Config.from_env()
         assert isinstance(config, Config)
 
-    def test_from_env_env_override_works(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_from_env_applies_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("FUGA_MEMORY_MODEL_NAME", "compat/model")
         config = Config.from_env()
         assert config.model_name == "compat/model"
+
+    def test_from_env_does_not_read_config_files(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """from_env() は設定ファイルを読まない（環境変数のみ）。"""
+        # XDG_CONFIG_HOME を tmp_path に向けて設定ファイルを置いても無視されること
+        config_dir = tmp_path / "fuga-memory"
+        config_dir.mkdir()
+        (config_dir / "config.toml").write_text("[fuga-memory]\nrrf_k = 999\n")
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.delenv("FUGA_MEMORY_RRF_K", raising=False)
+
+        config = Config.from_env()
+        assert config.rrf_k == 60  # デフォルト値のまま（ファイルは読まれない）

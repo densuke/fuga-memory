@@ -17,8 +17,9 @@ from __future__ import annotations
 import os
 import sys
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Any
 
 
 def _default_db_path() -> Path:
@@ -59,59 +60,52 @@ def _parse_toml_file(path: Path) -> dict[str, object]:
     return {k: v for k, v in data.items() if not isinstance(v, dict)}
 
 
+def _parse_int(value: object, key: str, path: Path) -> int:
+    """TOML 値を int に変換する。失敗時はキー名とファイルパスを含むエラーを出す。"""
+    try:
+        return int(str(value))
+    except ValueError as exc:
+        raise ValueError(
+            f"設定ファイル '{path}' の '{key}' に無効な整数値が設定されています: {value!r}"
+        ) from exc
+
+
 def _apply_toml(config: Config, path: Path) -> Config:
     """TOML ファイルの値を Config に適用して新しい Config を返す。"""
     values = _parse_toml_file(path)
-
-    db_path = config.db_path
-    model_name = config.model_name
-    thread_workers = config.thread_workers
-    rrf_k = config.rrf_k
-    decay_halflife_days = config.decay_halflife_days
-    default_top_k = config.default_top_k
+    updates: dict[str, Any] = {}
 
     if "db_path" in values:
-        db_path = Path(str(values["db_path"])).expanduser()
+        updates["db_path"] = Path(str(values["db_path"])).expanduser()
     if "model_name" in values:
-        model_name = str(values["model_name"])
+        updates["model_name"] = str(values["model_name"])
     if "thread_workers" in values:
-        thread_workers = int(str(values["thread_workers"]))
+        updates["thread_workers"] = _parse_int(values["thread_workers"], "thread_workers", path)
     if "rrf_k" in values:
-        rrf_k = int(str(values["rrf_k"]))
+        updates["rrf_k"] = _parse_int(values["rrf_k"], "rrf_k", path)
     if "decay_halflife_days" in values:
-        decay_halflife_days = int(str(values["decay_halflife_days"]))
+        updates["decay_halflife_days"] = _parse_int(
+            values["decay_halflife_days"], "decay_halflife_days", path
+        )
     if "default_top_k" in values:
-        default_top_k = int(str(values["default_top_k"]))
+        updates["default_top_k"] = _parse_int(values["default_top_k"], "default_top_k", path)
 
-    return Config(
-        db_path=db_path,
-        model_name=model_name,
-        embedding_dim=config.embedding_dim,
-        thread_workers=thread_workers,
-        rrf_k=rrf_k,
-        decay_halflife_days=decay_halflife_days,
-        default_top_k=default_top_k,
-    )
+    return replace(config, **updates)
 
 
 def _apply_env(config: Config) -> Config:
     """環境変数の値を Config に適用して新しい Config を返す。"""
-    db_path = config.db_path
-    model_name = config.model_name
-    thread_workers = config.thread_workers
-    rrf_k = config.rrf_k
-    decay_halflife_days = config.decay_halflife_days
-    default_top_k = config.default_top_k
+    updates: dict[str, Any] = {}
 
     if db_path_str := os.environ.get("FUGA_MEMORY_DB_PATH"):
-        db_path = Path(db_path_str)
+        updates["db_path"] = Path(db_path_str).expanduser()
 
     if model_name_env := os.environ.get("FUGA_MEMORY_MODEL_NAME"):
-        model_name = model_name_env
+        updates["model_name"] = model_name_env
 
     if workers_str := os.environ.get("FUGA_MEMORY_THREAD_WORKERS"):
         try:
-            thread_workers = int(workers_str)
+            updates["thread_workers"] = int(workers_str)
         except ValueError as exc:
             raise ValueError(
                 f"FUGA_MEMORY_THREAD_WORKERS に無効な値が設定されています: {workers_str!r}"
@@ -120,7 +114,7 @@ def _apply_env(config: Config) -> Config:
 
     if rrf_k_str := os.environ.get("FUGA_MEMORY_RRF_K"):
         try:
-            rrf_k = int(rrf_k_str)
+            updates["rrf_k"] = int(rrf_k_str)
         except ValueError as exc:
             raise ValueError(
                 f"FUGA_MEMORY_RRF_K に無効な値が設定されています: {rrf_k_str!r}"
@@ -129,7 +123,7 @@ def _apply_env(config: Config) -> Config:
 
     if halflife_str := os.environ.get("FUGA_MEMORY_DECAY_HALFLIFE_DAYS"):
         try:
-            decay_halflife_days = int(halflife_str)
+            updates["decay_halflife_days"] = int(halflife_str)
         except ValueError as exc:
             raise ValueError(
                 f"FUGA_MEMORY_DECAY_HALFLIFE_DAYS に無効な値が設定されています: {halflife_str!r}"
@@ -138,22 +132,14 @@ def _apply_env(config: Config) -> Config:
 
     if top_k_str := os.environ.get("FUGA_MEMORY_DEFAULT_TOP_K"):
         try:
-            default_top_k = int(top_k_str)
+            updates["default_top_k"] = int(top_k_str)
         except ValueError as exc:
             raise ValueError(
                 f"FUGA_MEMORY_DEFAULT_TOP_K に無効な値が設定されています: {top_k_str!r}"
                 " (整数を指定してください)"
             ) from exc
 
-    return Config(
-        db_path=db_path,
-        model_name=model_name,
-        embedding_dim=config.embedding_dim,
-        thread_workers=thread_workers,
-        rrf_k=rrf_k,
-        decay_halflife_days=decay_halflife_days,
-        default_top_k=default_top_k,
-    )
+    return replace(config, **updates)
 
 
 @dataclass
@@ -182,13 +168,18 @@ class Config:
         search_paths = [config_path] if config_path is not None else config_file_paths()
 
         for path in search_paths:
-            if path.exists():
+            if path.is_file():
                 config = _apply_toml(config, path)
                 break
+            elif path.exists():
+                raise IsADirectoryError(f"設定ファイルのパスがディレクトリです: {path}")
 
         return _apply_env(config)
 
     @classmethod
     def from_env(cls) -> Config:
-        """後方互換エイリアス。load() を呼ぶ。"""
-        return cls.load()
+        """環境変数のみを適用した Config を返す（設定ファイルは読まない）。
+
+        設定ファイルも含めて読み込みたい場合は load() を使用すること。
+        """
+        return _apply_env(cls())
