@@ -15,6 +15,33 @@ import click
 
 from fuga_memory import server as _server
 
+_MAX_INPUT_BYTES = 1_048_576  # 1MB
+
+
+def _read_stdin_limited(max_bytes: int = _MAX_INPUT_BYTES) -> str:
+    """stdin をチャンク読み込みし、上限を超えた場合はエラーを発生させる。
+
+    Args:
+        max_bytes: 読み込み上限バイト数
+
+    Returns:
+        読み込んだテキスト
+
+    Raises:
+        click.UsageError: 入力が上限を超えた場合
+    """
+    chunks: list[str] = []
+    total = 0
+    while True:
+        chunk = sys.stdin.read(8192)
+        if not chunk:
+            break
+        total += len(chunk.encode())
+        if total > max_bytes:
+            raise click.UsageError(f"入力が最大サイズ（{max_bytes:,} バイト）を超えています")
+        chunks.append(chunk)
+    return "".join(chunks)
+
 
 @click.group()
 def main() -> None:
@@ -96,9 +123,15 @@ def save(
         raise click.UsageError("content 引数、--stdin、--file のいずれかを指定してください。")
 
     if read_stdin:
-        body = sys.stdin.read()
+        body = _read_stdin_limited()
     elif file_path is not None:
-        body = file_path.read_text()
+        file_size = file_path.stat().st_size
+        if file_size > _MAX_INPUT_BYTES:
+            raise click.UsageError(
+                f"ファイルが最大サイズ（{_MAX_INPUT_BYTES:,} バイト）を超えています: "
+                f"{file_size:,} バイト"
+            )
+        body = file_path.read_text(encoding="utf-8")
     else:
         body = str(content)
 

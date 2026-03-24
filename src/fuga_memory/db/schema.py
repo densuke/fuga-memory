@@ -11,7 +11,13 @@ def initialize_schema(conn: sqlite3.Connection, embedding_dim: int = 768) -> Non
     Args:
         conn: SQLite接続
         embedding_dim: ベクトル次元数（Config.embedding_dim と一致させること）
+
+    Raises:
+        ValueError: embedding_dim が正の整数でない場合。
     """
+    if not isinstance(embedding_dim, int) or embedding_dim <= 0:
+        raise ValueError(f"embedding_dim は正の整数である必要があります: {embedding_dim!r}")
+
     conn.executescript(f"""
         CREATE TABLE IF NOT EXISTS memories (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,

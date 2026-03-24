@@ -125,13 +125,13 @@ class TestSaveMemory:
         ids = {r1["id"], r2["id"], r3["id"]}
         assert len(ids) == 3  # 全て異なる ID
 
-    def test_save_empty_content_does_not_raise(
+    def test_save_empty_content_raises(
         self,
         server_deps: dict[str, Any],
     ) -> None:
-        """空文字列のコンテンツも保存できる（バリデーションは呼び出し側の責任）。"""
-        result = srv.save_memory("", "session-001")
-        assert result["status"] == "saved"
+        """空文字列のコンテンツは ValueError を発生させる。"""
+        with pytest.raises(ValueError, match="空文字列"):
+            srv.save_memory("", "session-001")
 
 
 # ---------------------------------------------------------------------------

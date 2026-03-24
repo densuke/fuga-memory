@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from typing import Any
 
@@ -20,6 +21,13 @@ from fuga_memory.embedding.loader import ModelLoader
 from fuga_memory.search.fts import search_fts
 from fuga_memory.search.fusion import reciprocal_rank_fusion
 from fuga_memory.search.vector import search_vector
+
+logger = logging.getLogger(__name__)
+
+# 入力値の上限定数
+_MAX_CONTENT_LENGTH = 100_000  # 100KB
+_MAX_TOP_K = 100
+_MAX_LIMIT = 200
 
 mcp: FastMCP = FastMCP("fuga-memory")
 
@@ -70,13 +78,22 @@ def save_memory(content: str, session_id: str, source: str = "manual") -> dict[s
     """記憶を保存する。
 
     Args:
-        content: 保存するテキスト。
+        content: 保存するテキスト（1文字以上、100,000文字以下）。
         session_id: セッション識別子。
         source: 記憶のソース（デフォルト: "manual"）。
 
     Returns:
         {"id": int, "status": "saved"}
+
+    Raises:
+        ValueError: content が空または上限を超えた場合。
     """
+    if not content:
+        raise ValueError("content は空文字列にできません")
+    if len(content) > _MAX_CONTENT_LENGTH:
+        raise ValueError(
+            f"content が最大サイズを超えています: {len(content)} > {_MAX_CONTENT_LENGTH}"
+        )
     conn = _get_conn()
     encoder = _get_encoder()
     config = _get_config()
@@ -102,6 +119,8 @@ def search_memory(query: str, top_k: int = 5) -> list[dict[str, Any]]:
     """
     if top_k < 1:
         raise ValueError(f"top_k は 1 以上である必要があります: {top_k}")
+    if top_k > _MAX_TOP_K:
+        raise ValueError(f"top_k は {_MAX_TOP_K} 以下である必要があります: {top_k}")
     conn = _get_conn()
     encoder = _get_encoder()
     config = _get_config()
@@ -135,6 +154,8 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
     """
     if limit < 1:
         raise ValueError(f"limit は 1 以上である必要があります: {limit}")
+    if limit > _MAX_LIMIT:
+        raise ValueError(f"limit は {_MAX_LIMIT} 以下である必要があります: {limit}")
     conn = _get_conn()
     cur = conn.execute(
         """
