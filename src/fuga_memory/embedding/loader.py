@@ -48,9 +48,7 @@ class ModelLoader:
 
         try:
             with ThreadPoolExecutor(max_workers=self._thread_workers) as executor:
-                future: Future[Encoder] = executor.submit(
-                    RuriEncoder, self._model_name
-                )
+                future: Future[Encoder] = executor.submit(RuriEncoder, self._model_name)
                 encoder = future.result()
         except Exception as exc:
             raise ModelLoadError(

@@ -24,6 +24,7 @@ class TestEncoderProtocol:
 
     def test_custom_class_satisfies_encoder_protocol(self) -> None:
         """encode(text: str) -> list[float] を実装したクラスは Encoder Protocol を満たす。"""
+
         class MyEncoder:
             def encode(self, text: str) -> list[float]:
                 return [0.0] * 768

@@ -143,13 +143,9 @@ class TestModelLoaderGetEncoder:
             return_value=mock_encoder,
         ):
             # ThreadPoolExecutor.submit() が返す Future.result() が呼ばれることを確認
-            with patch(
-                "fuga_memory.embedding.loader.ThreadPoolExecutor"
-            ) as mock_executor_cls:
+            with patch("fuga_memory.embedding.loader.ThreadPoolExecutor") as mock_executor_cls:
                 mock_executor = MagicMock()
-                mock_executor_cls.return_value.__enter__ = MagicMock(
-                    return_value=mock_executor
-                )
+                mock_executor_cls.return_value.__enter__ = MagicMock(return_value=mock_executor)
                 mock_executor_cls.return_value.__exit__ = MagicMock(return_value=False)
 
                 mock_future: Future[MagicMock] = Future()
