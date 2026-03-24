@@ -9,8 +9,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# FTS5 の特殊構文文字（フレーズ引用符・グルーピング・カラム指定等）
-_FTS5_SPECIAL = re.compile(r'["\(\)\*\^\:\.]')
+# FTS5 の特殊構文文字（フレーズ引用符・グルーピング・カラム指定・列指定・範囲等）
+_FTS5_SPECIAL = re.compile(r'["\(\)\*\^\:\.\{\}]')
 
 
 def _sanitize_fts_query(query: str) -> str:
@@ -26,8 +26,8 @@ def _sanitize_fts_query(query: str) -> str:
         サニタイズ済みクエリ文字列（トークン間はスペース区切り）
     """
     sanitized = _FTS5_SPECIAL.sub(" ", query)
-    # 大文字の論理演算子キーワードを小文字化（FTS5 は大文字限定で解釈）
-    sanitized = re.sub(r"\b(AND|OR|NOT)\b", lambda m: m.group().lower(), sanitized)
+    # 大文字の論理演算子・近接演算子キーワードを小文字化（FTS5 は大文字限定で解釈）
+    sanitized = re.sub(r"\b(AND|OR|NOT|NEAR)\b", lambda m: m.group().lower(), sanitized)
     return " ".join(sanitized.split())
 
 
@@ -67,6 +67,10 @@ def search_fts(
             (sanitized, top_k),
         )
         return [dict(row) for row in cur.fetchall()]
-    except sqlite3.OperationalError:
-        logger.warning("FTS5 検索でエラーが発生しました（サニタイズ後クエリ: %r）", sanitized)
-        return []
+    except sqlite3.OperationalError as exc:
+        msg = str(exc).lower()
+        # FTS5 の構文エラーのみフォールバック。DB ロック等の運用障害は再送出する。
+        if "fts5" in msg or "syntax error" in msg:
+            logger.warning("FTS5 構文エラーが発生しました（クエリ長: %d文字）", len(sanitized))
+            return []
+        raise

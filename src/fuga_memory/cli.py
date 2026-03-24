@@ -30,17 +30,22 @@ def _read_stdin_limited(max_bytes: int = _MAX_INPUT_BYTES) -> str:
     Raises:
         click.UsageError: 入力が上限を超えた場合
     """
-    chunks: list[str] = []
+    raw_chunks: list[bytes] = []
     total = 0
     while True:
-        chunk = sys.stdin.read(8192)
+        chunk = sys.stdin.buffer.read(8192)
         if not chunk:
             break
-        total += len(chunk.encode())
+        total += len(chunk)
         if total > max_bytes:
             raise click.UsageError(f"入力が最大サイズ（{max_bytes:,} バイト）を超えています")
-        chunks.append(chunk)
-    return "".join(chunks)
+        raw_chunks.append(chunk)
+    try:
+        return b"".join(raw_chunks).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise click.UsageError(
+            f"入力のデコードに失敗しました（UTF-8ではありません）: {exc}"
+        ) from exc
 
 
 @click.group()

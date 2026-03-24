@@ -89,8 +89,10 @@ def save_memory(content: str, session_id: str, source: str = "manual") -> dict[s
         ValueError: content が空または上限を超えた場合。
     """
     if not content:
+        logger.warning("save_memory: 空の content が拒否されました")
         raise ValueError("content は空文字列にできません")
     if len(content) > _MAX_CONTENT_LENGTH:
+        logger.warning("save_memory: content サイズ超過 (%d文字)", len(content))
         raise ValueError(
             f"content が最大サイズを超えています: {len(content)} > {_MAX_CONTENT_LENGTH}"
         )
@@ -115,7 +117,7 @@ def search_memory(query: str, top_k: int = 5) -> list[dict[str, Any]]:
         score の降順でソート済み。
 
     Raises:
-        ValueError: top_k が 1 未満の場合。
+        ValueError: top_k が 1 未満または {_MAX_TOP_K} 超の場合。
     """
     if top_k < 1:
         raise ValueError(f"top_k は 1 以上である必要があります: {top_k}")
@@ -150,7 +152,7 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
         [{"session_id", "memory_count", "last_updated"}, ...]
 
     Raises:
-        ValueError: limit が 1 未満の場合。
+        ValueError: limit が 1 未満または {_MAX_LIMIT} 超の場合。
     """
     if limit < 1:
         raise ValueError(f"limit は 1 以上である必要があります: {limit}")

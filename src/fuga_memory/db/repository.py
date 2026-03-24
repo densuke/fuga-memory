@@ -7,6 +7,7 @@ import struct
 from typing import Any
 
 from fuga_memory.embedding.encoder import Encoder
+from fuga_memory.search.fts import search_fts as _search_fts_safe
 
 EMBEDDING_DIM = 768
 
@@ -60,20 +61,8 @@ class MemoryRepository:
         return memory_id
 
     def search_fts(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
-        """FTS5全文検索で記憶を検索する。"""
-        cur = self._conn.execute(
-            """
-            SELECT m.id, m.content, m.session_id, m.source, m.created_at,
-                   rank AS rank
-            FROM memories_fts
-            JOIN memories m ON memories_fts.rowid = m.id
-            WHERE memories_fts MATCH ?
-            ORDER BY rank
-            LIMIT ?
-            """,
-            (query, top_k),
-        )
-        return [dict(row) for row in cur.fetchall()]
+        """FTS5全文検索で記憶を検索する。クエリは自動でサニタイズされる。"""
+        return _search_fts_safe(self._conn, query, top_k=top_k)
 
     def search_vector(self, query_vec: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         """ベクトル類似度で記憶を検索する。"""

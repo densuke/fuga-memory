@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Any
 
 # HuggingFace モデルID形式: "org/model-name" または "model-name"
-# 英数字・ハイフン・アンダースコア・スラッシュのみ許可
-_MODEL_NAME_PATTERN = re.compile(r"^[\w][\w\-\.]*(/[\w][\w\-\.]*)?$")
+# ASCII 英数字・ハイフン・アンダースコア・ドット・スラッシュのみ許可（Unicode 除外）
+_MODEL_NAME_PATTERN = re.compile(r"^[\w][\w\-\.]*(/[\w][\w\-\.]*)?$", re.ASCII)
 
 
 def _validate_model_name(model_name: str) -> str:
