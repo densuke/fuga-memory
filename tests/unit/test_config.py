@@ -143,6 +143,38 @@ class TestConfigLoadFromToml:
         config = Config.load(config_path=toml_file)
         assert config.rrf_k == 20
 
+    def test_toml_syntax_error_includes_path(self, tmp_path: Path) -> None:
+        """TOML 構文エラー時にファイルパスを含むエラーになる。"""
+        bad_toml = tmp_path / "bad.toml"
+        bad_toml.write_text("invalid toml [[[")
+        with pytest.raises(ValueError, match=str(bad_toml)):
+            Config.load(config_path=bad_toml)
+
+    def test_toml_thread_workers_zero_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\nthread_workers = 0\n")
+        with pytest.raises(ValueError, match="thread_workers"):
+            Config.load(config_path=toml_file)
+
+    def test_toml_rrf_k_negative_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\nrrf_k = -1\n")
+        with pytest.raises(ValueError, match="rrf_k"):
+            Config.load(config_path=toml_file)
+
+    def test_toml_decay_halflife_zero_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndecay_halflife_days = 0\n")
+        with pytest.raises(ValueError, match="decay_halflife_days"):
+            Config.load(config_path=toml_file)
+
+    def test_toml_rrf_k_zero_is_valid(self, tmp_path: Path) -> None:
+        """rrf_k = 0 は許容される（最小値は 0）。"""
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\nrrf_k = 0\n")
+        config = Config.load(config_path=toml_file)
+        assert config.rrf_k == 0
+
 
 class TestConfigEnvOverride:
     """環境変数による設定上書き（全フィールド対象）。"""
@@ -203,6 +235,34 @@ class TestConfigEnvOverride:
     def test_invalid_rrf_k_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("FUGA_MEMORY_RRF_K", "notanint")
         with pytest.raises(ValueError, match="FUGA_MEMORY_RRF_K"):
+            Config.load(config_path=self._no_file(tmp_path))
+
+    def test_thread_workers_zero_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FUGA_MEMORY_THREAD_WORKERS=0 は範囲エラー。"""
+        monkeypatch.setenv("FUGA_MEMORY_THREAD_WORKERS", "0")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_THREAD_WORKERS"):
+            Config.load(config_path=self._no_file(tmp_path))
+
+    def test_rrf_k_negative_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """FUGA_MEMORY_RRF_K=-1 は範囲エラー（ゼロ除算防止）。"""
+        monkeypatch.setenv("FUGA_MEMORY_RRF_K", "-1")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_RRF_K"):
+            Config.load(config_path=self._no_file(tmp_path))
+
+    def test_rrf_k_zero_is_valid(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """FUGA_MEMORY_RRF_K=0 は許容される。"""
+        monkeypatch.setenv("FUGA_MEMORY_RRF_K", "0")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.rrf_k == 0
+
+    def test_decay_halflife_zero_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """FUGA_MEMORY_DECAY_HALFLIFE_DAYS=0 は範囲エラー。"""
+        monkeypatch.setenv("FUGA_MEMORY_DECAY_HALFLIFE_DAYS", "0")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_DECAY_HALFLIFE_DAYS"):
             Config.load(config_path=self._no_file(tmp_path))
 
     def test_defaults_when_env_not_set(
