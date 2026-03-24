@@ -41,6 +41,20 @@ class TestModelLoaderInit:
         loader = ModelLoader(model_name="test-model", thread_workers=4)
         assert loader.thread_workers == 4
 
+    def test_init_raises_on_zero_thread_workers(self) -> None:
+        """thread_workers=0 は ValueError を発生させる。"""
+        from fuga_memory.embedding.loader import ModelLoader
+
+        with pytest.raises(ValueError, match="thread_workers"):
+            ModelLoader(model_name="test-model", thread_workers=0)
+
+    def test_init_raises_on_negative_thread_workers(self) -> None:
+        """thread_workers が負の値の場合は ValueError を発生させる。"""
+        from fuga_memory.embedding.loader import ModelLoader
+
+        with pytest.raises(ValueError, match="thread_workers"):
+            ModelLoader(model_name="test-model", thread_workers=-1)
+
 
 class TestModelLoaderGetEncoder:
     def test_get_encoder_returns_encoder(self) -> None:
@@ -132,44 +146,40 @@ class TestModelLoaderGetEncoder:
         assert len(load_thread_id) == 1
 
     def test_get_encoder_future_result_is_awaited(self) -> None:
-        """get_encoder() は concurrent.futures.Future を経由してロード結果を取得する。"""
+        """get_encoder() は ThreadPoolExecutor.submit() の Future 経由でロード結果を取得する。"""
         from fuga_memory.embedding.loader import ModelLoader
 
         mock_encoder = MagicMock()
         mock_encoder.encode.return_value = [0.0] * 768
 
-        with patch(
-            "fuga_memory.embedding.loader.RuriEncoder",
-            return_value=mock_encoder,
-        ):
-            # ThreadPoolExecutor.submit() が返す Future.result() が呼ばれることを確認
-            with patch("fuga_memory.embedding.loader.ThreadPoolExecutor") as mock_executor_cls:
-                mock_executor = MagicMock()
-                mock_executor_cls.return_value.__enter__ = MagicMock(return_value=mock_executor)
-                mock_executor_cls.return_value.__exit__ = MagicMock(return_value=False)
+        with patch("fuga_memory.embedding.loader.ThreadPoolExecutor") as mock_executor_cls:
+            mock_executor = MagicMock()
+            mock_executor_cls.return_value = mock_executor
 
-                mock_future: Future[MagicMock] = Future()
-                mock_future.set_result(mock_encoder)
-                mock_executor.submit.return_value = mock_future
+            mock_future: Future[MagicMock] = Future()
+            mock_future.set_result(mock_encoder)
+            mock_executor.submit.return_value = mock_future
 
-                loader2 = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=1)
-                encoder = loader2.get_encoder()
+            loader2 = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=1)
+            encoder = loader2.get_encoder()
 
-            assert encoder is mock_encoder
+        assert encoder is mock_encoder
 
 
 class TestModelLoaderThreadSafety:
     def test_concurrent_get_encoder_calls_return_same_object(self) -> None:
-        """並行して get_encoder() を呼んでも同一オブジェクトが返る。"""
+        """並行して get_encoder() を呼んでも同一オブジェクトが返る。
+
+        RuriEncoder の呼び出し回数が 1 であることで重複ロードが起きていないことを保証する。
+        """
         from fuga_memory.embedding.loader import ModelLoader
 
-        mock_encoder = MagicMock()
-        mock_encoder.encode.return_value = [0.0] * 768
+        mock_encoder_a = MagicMock()
+        mock_encoder_b = MagicMock()
+        # side_effect で呼ばれるたびに異なるオブジェクトを返す（重複生成の検出に使う）
+        mock_ruri_cls = MagicMock(side_effect=[mock_encoder_a, mock_encoder_b])
 
-        with patch(
-            "fuga_memory.embedding.loader.RuriEncoder",
-            return_value=mock_encoder,
-        ):
+        with patch("fuga_memory.embedding.loader.RuriEncoder", mock_ruri_cls):
             loader = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=2)
             results: list[object] = []
 
@@ -184,6 +194,8 @@ class TestModelLoaderThreadSafety:
                 t.join()
 
         assert len(results) == 5
-        # 全て同一オブジェクト
+        # RuriEncoder は1度しか生成されない（スレッドセーフの証明）
+        assert mock_ruri_cls.call_count == 1
+        # 全スレッドが同一オブジェクトを受け取る
         first = results[0]
         assert all(r is first for r in results)
