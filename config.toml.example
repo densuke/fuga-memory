@@ -1,0 +1,38 @@
+# fuga-memory 設定ファイルテンプレート
+#
+# 以下のいずれかにコピーして配置してください（先に見つかったものが使用されます）:
+#
+#   macOS: ~/Library/Application Support/fuga-memory/config.toml
+#   Linux: ~/.config/fuga-memory/config.toml
+#          ($XDG_CONFIG_HOME が設定されている場合は $XDG_CONFIG_HOME/fuga-memory/config.toml)
+#   共通:  ~/.fuga-memory.toml
+#
+# 設定の優先順位: デフォルト値 < 設定ファイル < 環境変数 (FUGA_MEMORY_*)
+
+[fuga-memory]
+
+# SQLite データベースファイルのパス
+# デフォルト: ~/.local/share/fuga-memory/memories.db
+# db_path = "~/.local/share/fuga-memory/memories.db"
+
+# 埋め込みモデル名 (HuggingFace Hub のモデル ID)
+# デフォルト: cl-nagoya/ruri-v3-310m (日本語特化、ONNX で CPU 動作、約 600MB)
+# model_name = "cl-nagoya/ruri-v3-310m"
+
+# 推論・DB 操作に使用するスレッド数
+# デフォルト: CPU 論理コア数 ÷ 2 (最低 1)
+# thread_workers = 2
+
+# RRF (Reciprocal Rank Fusion) の k パラメータ
+# 値を大きくすると上位ランクの影響が弱まり、ランキングが均一化される
+# デフォルト: 60
+# rrf_k = 60
+
+# 時間減衰の半減期（日数）
+# 記憶スコアが半分になるまでの日数。短くすると古い記憶が早く埋もれる
+# デフォルト: 30
+# decay_halflife_days = 30
+
+# search_memory ツールのデフォルト返却件数
+# デフォルト: 5
+# default_top_k = 5
