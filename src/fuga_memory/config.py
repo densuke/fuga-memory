@@ -12,8 +12,6 @@ def _default_db_path() -> Path:
 
 
 def _default_thread_workers() -> int:
-    import os
-
     cpu = os.cpu_count() or 2
     return max(1, cpu // 2)
 
@@ -40,6 +38,12 @@ class Config:
             config.model_name = model_name
 
         if workers_str := os.environ.get("FUGA_MEMORY_THREAD_WORKERS"):
-            config.thread_workers = int(workers_str)
+            try:
+                config.thread_workers = int(workers_str)
+            except ValueError as exc:
+                raise ValueError(
+                    f"FUGA_MEMORY_THREAD_WORKERS に無効な値が設定されています: {workers_str!r}"
+                    " (整数を指定してください)"
+                ) from exc
 
         return config
