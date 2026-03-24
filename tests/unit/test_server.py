@@ -6,7 +6,9 @@ fastmcp のトランスポート層はテスト対象外。
 
 from __future__ import annotations
 
+import gc
 import sqlite3
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -30,8 +32,8 @@ def mock_encoder() -> MagicMock:
 
 
 @pytest.fixture
-def in_memory_conn() -> sqlite3.Connection:
-    """インメモリ SQLite 接続（スキーマ初期化済み）。"""
+def in_memory_conn() -> Generator[sqlite3.Connection]:
+    """インメモリ SQLite 接続（スキーマ初期化済み）。テスト終了時にクローズ。"""
     import sqlite_vec
 
     conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -42,16 +44,28 @@ def in_memory_conn() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.commit()
     initialize_schema(conn)
-    return conn
+    yield conn
+    conn.close()
+    gc.collect()  # Python 3.13 でのGC遅延による ResourceWarning を防ぐ
 
 
 @pytest.fixture
-def server_deps(in_memory_conn: sqlite3.Connection, mock_encoder: MagicMock) -> dict[str, Any]:
-    """server モジュールが依存するオブジェクトをまとめた辞書。"""
-    return {
+def server_deps(
+    in_memory_conn: sqlite3.Connection,
+    mock_encoder: MagicMock,
+) -> Generator[dict[str, Any]]:
+    """server モジュールが依存するオブジェクトをまとめた辞書。テスト後にグローバルをリセット。"""
+    import fuga_memory.server as srv
+
+    srv._conn = in_memory_conn  # type: ignore[attr-defined]
+    srv._encoder = mock_encoder  # type: ignore[attr-defined]
+    yield {
         "conn": in_memory_conn,
         "encoder": mock_encoder,
     }
+    # テスト後にサーバーグローバルをリセットして参照を解放
+    srv._conn = None  # type: ignore[attr-defined]
+    srv._encoder = None  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -63,14 +77,13 @@ def _make_patched_server(
     conn: sqlite3.Connection,
     encoder: MagicMock,
 ) -> Any:
-    """server モジュールをインポートし、グローバル依存を差し替えた状態で返す。"""
-    import importlib
+    """server モジュールのグローバル依存を差し替えた状態で返す。
 
+    server_deps fixture が既に _conn / _encoder を設定しているが、
+    本関数は直接呼び出しパターンでも使えるよう差し替えを行う。
+    """
     import fuga_memory.server as srv
 
-    importlib.reload(srv)
-
-    # グローバル変数を差し替える
     srv._conn = conn  # type: ignore[attr-defined]
     srv._encoder = encoder  # type: ignore[attr-defined]
 

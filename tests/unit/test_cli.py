@@ -6,7 +6,9 @@ DB・エンコーダは mock で差し替える。
 
 from __future__ import annotations
 
+import gc
 import sqlite3
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -34,8 +36,8 @@ def mock_encoder() -> MagicMock:
 
 
 @pytest.fixture
-def in_memory_conn() -> sqlite3.Connection:
-    """インメモリ SQLite 接続（スキーマ初期化済み）。"""
+def in_memory_conn() -> Generator[sqlite3.Connection]:
+    """インメモリ SQLite 接続（スキーマ初期化済み）。テスト終了時にクローズ。"""
     import sqlite_vec
 
     from fuga_memory.db.schema import initialize_schema
@@ -48,7 +50,19 @@ def in_memory_conn() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.commit()
     initialize_schema(conn)
-    return conn
+    yield conn
+    conn.close()
+    gc.collect()  # Python 3.13 でのGC遅延による ResourceWarning を防ぐ
+
+
+@pytest.fixture(autouse=True)
+def _reset_server_globals() -> Generator[None]:
+    """各テスト後に server モジュールのグローバルをリセットして参照を解放。"""
+    yield
+    import fuga_memory.server as srv
+
+    srv._conn = None  # type: ignore[attr-defined]
+    srv._encoder = None  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
