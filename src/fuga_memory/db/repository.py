@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import sqlite3
 import struct
-from typing import Any, Protocol
+from typing import Any
+
+from fuga_memory.embedding.encoder import Encoder
 
 EMBEDDING_DIM = 768
 
-
-class Encoder(Protocol):
-    """テキストをベクトルに変換するプロトコル。"""
-
-    def encode(self, text: str) -> list[float]: ...
+__all__ = ["Encoder", "MemoryRepository"]
 
 
 class MemoryRepository:
