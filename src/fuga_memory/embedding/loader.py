@@ -16,6 +16,7 @@ class ModelLoader:
     結果が得られるまでブロックする。2回目以降はキャッシュを返す。
 
     複数スレッドから同時に呼び出された場合でも、モデルロードは1回だけ実行される。
+    ロードに失敗した場合は次回呼び出しで再試行できる。
     """
 
     def __init__(self, model_name: str, thread_workers: int = 1) -> None:
@@ -43,6 +44,7 @@ class ModelLoader:
         初回呼び出し時は ThreadPoolExecutor でロードを実行し、
         結果が得られるまでブロックする。2回目以降はキャッシュを返す。
         複数スレッドから同時に呼び出されても、ロードは1度のみ実行される。
+        ロードに失敗した場合は次回呼び出しで再試行できる。
 
         Returns:
             Encoder プロトコルを満たすエンコーダオブジェクト。
@@ -70,11 +72,18 @@ class ModelLoader:
         try:
             encoder = future.result()
         except Exception as exc:
+            # 失敗した Future をリセットして次回呼び出しで再試行できるようにする
+            with self._lock:
+                if self._future is future:
+                    self._future = None
             raise ModelLoadError(
                 f"モデル '{self._model_name}' のロードに失敗しました: {exc}"
             ) from exc
 
+        # ロード成功: エンコーダをキャッシュし、Future の参照を解放する
         with self._lock:
-            self._encoder = encoder
+            if self._encoder is None:
+                self._encoder = encoder
+            self._future = None
 
         return self._encoder

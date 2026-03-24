@@ -121,29 +121,48 @@ class TestModelLoaderGetEncoder:
             with pytest.raises(ModelLoadError):
                 loader.get_encoder()
 
-    def test_get_encoder_background_load_uses_thread_pool(self) -> None:
-        """モデルロードは ThreadPoolExecutor を使ってバックグラウンド実行される。"""
+    def test_get_encoder_retries_after_failure(self) -> None:
+        """ロード失敗後に再度 get_encoder() を呼ぶと再試行できる。"""
         from fuga_memory.embedding.loader import ModelLoader
 
         mock_encoder = MagicMock()
         mock_encoder.encode.return_value = [0.0] * 768
-        load_thread_id: list[int] = []
 
-        def capturing_constructor(model_name: str) -> MagicMock:
-            load_thread_id.append(threading.get_ident())
-            return mock_encoder
-
+        # 1回目は失敗、2回目は成功
         with patch(
             "fuga_memory.embedding.loader.RuriEncoder",
-            side_effect=capturing_constructor,
+            side_effect=[RuntimeError("1回目失敗"), mock_encoder],
         ):
-            loader = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=1)
+            loader = ModelLoader(model_name="test-model", thread_workers=1)
+            with pytest.raises(ModelLoadError):
+                loader.get_encoder()
+            # 失敗後に再試行でき、成功する
+            encoder = loader.get_encoder()
+            assert encoder is mock_encoder
+
+    def test_get_encoder_uses_thread_pool_executor(self) -> None:
+        """get_encoder() は ThreadPoolExecutor.submit() を使ってモデルをロードする。"""
+        from fuga_memory.embedding.loader import ModelLoader
+
+        mock_encoder = MagicMock()
+        mock_encoder.encode.return_value = [0.0] * 768
+
+        with patch("fuga_memory.embedding.loader.ThreadPoolExecutor") as mock_executor_cls:
+            mock_executor = MagicMock()
+            mock_executor_cls.return_value = mock_executor
+
+            future: Future[MagicMock] = Future()
+            future.set_result(mock_encoder)
+            mock_executor.submit.return_value = future
+
+            loader = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=2)
             loader.get_encoder()
 
-        # ロードは別スレッドで行われる（ThreadPoolExecutor使用時）
-        # または同スレッドだが Future.result() でブロック
-        # 少なくとも1回呼ばれていることを確認
-        assert len(load_thread_id) == 1
+        # ThreadPoolExecutor が指定のワーカー数で生成され、submit が呼ばれたことを確認
+        mock_executor_cls.assert_called_once_with(max_workers=2)
+        mock_executor.submit.assert_called_once()
+        # shutdown(wait=False) で executor が解放されたことを確認
+        mock_executor.shutdown.assert_called_once_with(wait=False)
 
     def test_get_encoder_future_result_is_awaited(self) -> None:
         """get_encoder() は ThreadPoolExecutor.submit() の Future 経由でロード結果を取得する。"""

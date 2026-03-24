@@ -156,7 +156,7 @@ class TestRuriEncoderEncode:
         mock_st.encode.return_value = np.zeros(768, dtype=np.float32)
 
         encoder = self._make_encoder(mock_st)
-        result = encoder.encode("日本語テキスト：情報を記憶する")
+        result = encoder.encode("日本語テキスト：情報を記憶する🧠")
 
         assert isinstance(result, list)
         assert len(result) == 768
