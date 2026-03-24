@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+import fuga_memory.server as srv
 from fuga_memory.db.schema import initialize_schema
 
 # ---------------------------------------------------------------------------
@@ -54,41 +55,18 @@ def server_deps(
     in_memory_conn: sqlite3.Connection,
     mock_encoder: MagicMock,
 ) -> Generator[dict[str, Any]]:
-    """server モジュールが依存するオブジェクトをまとめた辞書。テスト後にグローバルをリセット。"""
-    import fuga_memory.server as srv
+    """server モジュールのグローバル依存を差し替え、テスト後にリセットする。
 
+    テスト内では `srv` モジュールを直接参照してツール関数を呼び出す。
+    DB への直接アクセスが必要な場合は `server_deps["conn"]` を使用する。
+    """
     srv._conn = in_memory_conn  # type: ignore[attr-defined]
     srv._encoder = mock_encoder  # type: ignore[attr-defined]
-    yield {
-        "conn": in_memory_conn,
-        "encoder": mock_encoder,
-    }
+    yield {"conn": in_memory_conn}
     # テスト後にサーバーグローバルをリセットして参照を解放
     srv._conn = None  # type: ignore[attr-defined]
     srv._encoder = None  # type: ignore[attr-defined]
     srv._config = None  # type: ignore[attr-defined]
-
-
-# ---------------------------------------------------------------------------
-# Helper: サーバー関数を依存注入してテストする
-# ---------------------------------------------------------------------------
-
-
-def _make_patched_server(
-    conn: sqlite3.Connection,
-    encoder: MagicMock,
-) -> Any:
-    """server モジュールのグローバル依存を差し替えた状態で返す。
-
-    server_deps fixture が既に _conn / _encoder を設定しているが、
-    本関数は直接呼び出しパターンでも使えるよう差し替えを行う。
-    """
-    import fuga_memory.server as srv
-
-    srv._conn = conn  # type: ignore[attr-defined]
-    srv._encoder = encoder  # type: ignore[attr-defined]
-
-    return srv
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +80,6 @@ class TestSaveMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """save_memory は {"id": int, "status": "saved"} を返す。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         result = srv.save_memory("テスト記憶", "session-001", "manual")
 
         assert isinstance(result["id"], int)
@@ -115,7 +92,6 @@ class TestSaveMemory:
     ) -> None:
         """save_memory で保存した記憶が DB に存在する。"""
         conn = server_deps["conn"]
-        srv = _make_patched_server(conn, server_deps["encoder"])
 
         result = srv.save_memory("SQLiteの使い方", "session-002", "claude_code")
         saved_id = result["id"]
@@ -132,7 +108,6 @@ class TestSaveMemory:
     ) -> None:
         """source を省略した場合のデフォルト値は 'manual'。"""
         conn = server_deps["conn"]
-        srv = _make_patched_server(conn, server_deps["encoder"])
 
         result = srv.save_memory("デフォルトソーステスト", "session-003")
         row = conn.execute("SELECT source FROM memories WHERE id = ?", (result["id"],)).fetchone()
@@ -143,8 +118,6 @@ class TestSaveMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """複数の記憶を保存でき、それぞれ異なる ID が割り当てられる。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-
         r1 = srv.save_memory("記憶1", "session-001")
         r2 = srv.save_memory("記憶2", "session-001")
         r3 = srv.save_memory("記憶3", "session-002")
@@ -157,7 +130,6 @@ class TestSaveMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """空文字列のコンテンツも保存できる（バリデーションは呼び出し側の責任）。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         result = srv.save_memory("", "session-001")
         assert result["status"] == "saved"
 
@@ -168,7 +140,7 @@ class TestSaveMemory:
 
 
 class TestSearchMemory:
-    def _populate(self, srv: Any, contents: list[tuple[str, str, str]]) -> None:
+    def _populate(self, contents: list[tuple[str, str, str]]) -> None:
         """(content, session_id, source) のリストを一括保存するヘルパー。"""
         for content, session_id, source in contents:
             srv.save_memory(content, session_id, source)
@@ -178,11 +150,7 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """search_memory はリストを返す。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-        self._populate(
-            srv,
-            [("Pythonのasyncioについて調べた", "s1", "manual")],
-        )
+        self._populate([("Pythonのasyncioについて調べた", "s1", "manual")])
         results = srv.search_memory("Python")
         assert isinstance(results, list)
 
@@ -191,11 +159,7 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """検索結果の各要素は必須フィールドを持つ。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-        self._populate(
-            srv,
-            [("Rustのlifetimeを理解した", "s1", "manual")],
-        )
+        self._populate([("Rustのlifetimeを理解した", "s1", "manual")])
         results = srv.search_memory("Rust")
         assert len(results) >= 1
         item = results[0]
@@ -207,8 +171,6 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """top_k を指定すると返る件数が top_k 以下になる。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-        # 10 件保存
         for i in range(10):
             srv.save_memory(f"記憶{i}: Pythonのテスト", "s1", "manual")
 
@@ -220,7 +182,6 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """DB が空のとき、search_memory は空リストを返す。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         results = srv.search_memory("全くマッチしないクエリXYZ")
         assert results == []
 
@@ -229,11 +190,7 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """スコアは float 型で返る。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
-        self._populate(
-            srv,
-            [("SQLiteのFTS5を使ったフルテキスト検索", "s1", "manual")],
-        )
+        self._populate([("SQLiteのFTS5を使ったフルテキスト検索", "s1", "manual")])
         results = srv.search_memory("SQLite")
         if results:
             assert isinstance(results[0]["score"], float)
@@ -243,7 +200,6 @@ class TestSearchMemory:
         server_deps: dict[str, Any],
     ) -> None:
         """top_k のデフォルト値は 5 で、返る件数は 5 以下になる。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         for i in range(10):
             srv.save_memory(f"記憶{i}: テストコンテンツ Python", "s1", "manual")
 
@@ -262,7 +218,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """list_sessions はリストを返す。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         result = srv.list_sessions()
         assert isinstance(result, list)
 
@@ -271,7 +226,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """記憶が0件のとき、list_sessions は空リストを返す。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         result = srv.list_sessions()
         assert result == []
 
@@ -280,7 +234,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """セッション一覧の各要素は必須フィールドを持つ。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         srv.save_memory("記憶", "session-001", "manual")
         sessions = srv.list_sessions()
         assert len(sessions) >= 1
@@ -293,7 +246,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """各セッションの memory_count が正しく集計される。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         srv.save_memory("記憶1", "session-A", "manual")
         srv.save_memory("記憶2", "session-A", "manual")
         srv.save_memory("記憶3", "session-B", "manual")
@@ -308,7 +260,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """limit パラメータで返す件数を制限できる。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         for i in range(5):
             srv.save_memory("記憶", f"session-{i:03d}", "manual")
 
@@ -320,7 +271,6 @@ class TestListSessions:
         server_deps: dict[str, Any],
     ) -> None:
         """limit のデフォルト値は 20 で、返る件数は 20 以下になる。"""
-        srv = _make_patched_server(server_deps["conn"], server_deps["encoder"])
         for i in range(25):
             srv.save_memory("記憶", f"session-{i:03d}", "manual")
 
@@ -333,7 +283,6 @@ class TestListSessions:
     ) -> None:
         """セッション一覧は last_updated の降順（同値時は id 降順）で返る。"""
         conn = server_deps["conn"]
-        srv = _make_patched_server(conn, server_deps["encoder"])
         srv.save_memory("古い記憶", "session-old", "manual")
         srv.save_memory("新しい記憶", "session-new", "manual")
 
