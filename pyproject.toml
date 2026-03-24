@@ -52,3 +52,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.13"
 strict = true
 files = ["src/"]
+
+[[tool.mypy.overrides]]
+module = ["sqlite_vec"]
+ignore_missing_imports = true

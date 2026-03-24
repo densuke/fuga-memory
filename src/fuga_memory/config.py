@@ -31,15 +31,15 @@ class Config:
     @classmethod
     def from_env(cls) -> Config:
         """環境変数からConfigを生成する。"""
-        kwargs: dict[str, object] = {}
+        config = cls()
 
         if db_path_str := os.environ.get("FUGA_MEMORY_DB_PATH"):
-            kwargs["db_path"] = Path(db_path_str)
+            config.db_path = Path(db_path_str)
 
         if model_name := os.environ.get("FUGA_MEMORY_MODEL_NAME"):
-            kwargs["model_name"] = model_name
+            config.model_name = model_name
 
         if workers_str := os.environ.get("FUGA_MEMORY_THREAD_WORKERS"):
-            kwargs["thread_workers"] = int(workers_str)
+            config.thread_workers = int(workers_str)
 
-        return cls(**kwargs)
+        return config
