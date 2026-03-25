@@ -1,6 +1,6 @@
 # Changelog
 
-fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lang/ja/) に準拠しています。
+fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lang/ja/) に準拠したバージョン管理へ今後移行する予定です。
 
 ---
 
@@ -28,7 +28,7 @@ UTC と JST の混同が起きやすい状態でした。
 
 **HIGH**
 - FTS5 クエリのサニタイズ処理を追加（`search/fts.py`）
-  - 特殊文字（`"()*.:{}`）と大文字演算子（`AND`/`OR`/`NOT`/`NEAR`）を除去
+  - 特殊文字（`"()*.:{}^`）を除去し、大文字演算子（`AND`/`OR`/`NOT`/`NEAR`）は小文字化して演算子として解釈されないようにサニタイズ
   - `OperationalError` を FTS5 構文エラーに限定してフォールバック
 - `top_k` / `limit` の上限バリデーションを追加（`MAX_TOP_K=100`, `MAX_LIMIT=200`）
 
