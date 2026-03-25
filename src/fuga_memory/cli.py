@@ -9,11 +9,26 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import click
 
 from fuga_memory import server as _server
+
+
+def _to_localtime(utc_str: str) -> str:
+    """UTC ISO 文字列をシステムのローカルタイムに変換して返す。
+
+    Args:
+        utc_str: 末尾 'Z' の UTC ISO 8601 文字列（例: '2026-03-25T00:12:33Z'）
+
+    Returns:
+        ローカルタイムの文字列（例: '2026-03-25 09:12:33 JST'）
+    """
+    dt = datetime.fromisoformat(utc_str.replace("Z", "+00:00"))
+    return dt.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+
 
 _MAX_INPUT_BYTES = 1_048_576  # 1MB
 
@@ -79,7 +94,7 @@ def search(query: str, top_k: int) -> None:
     for i, item in enumerate(results, start=1):
         click.echo(f"[{i}] score={item['score']:.4f}  session={item['session_id']}")
         click.echo(f"    {item['content']}")
-        click.echo(f"    source={item['source']}  created_at={item['created_at']}")
+        click.echo(f"    source={item['source']}  created_at={_to_localtime(item['created_at'])}")
         click.echo()
 
 

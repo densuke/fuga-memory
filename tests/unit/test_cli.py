@@ -9,6 +9,7 @@ from __future__ import annotations
 import gc
 import sqlite3
 from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -390,3 +391,36 @@ class TestMainGroup:
 
         result = runner.invoke(main, ["--help"])
         assert "save" in result.output
+
+
+# ---------------------------------------------------------------------------
+# _to_localtime のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestToLocaltime:
+    def test_utc_string_is_converted(self) -> None:
+        """UTC 文字列がローカルタイムに変換される（タイムゾーン表記が含まれる）。"""
+        from fuga_memory.cli import _to_localtime
+
+        result = _to_localtime("2026-03-25T00:12:33Z")
+        # ローカル変換後は年月日・時刻・タイムゾーン略称が含まれる
+        assert "2026-" in result
+        assert len(result) > 19  # UTC 文字列より長い（タイムゾーン略称が付く）
+
+    def test_returns_string(self) -> None:
+        """戻り値は文字列。"""
+        from fuga_memory.cli import _to_localtime
+
+        assert isinstance(_to_localtime("2026-01-01T00:00:00Z"), str)
+
+    def test_utc_midnight_converts_to_local(self) -> None:
+        """UTC 00:00:00 はローカルタイムで 00:00:00 にはならない（UTC+0 以外の環境）。"""
+
+        from fuga_memory.cli import _to_localtime
+
+        result = _to_localtime("2026-03-25T00:00:00Z")
+        # UTC+0 でない環境では時刻が変わっている
+        local_offset = datetime.now(UTC).astimezone().utcoffset()
+        if local_offset is not None and local_offset.total_seconds() != 0:
+            assert "00:00:00" not in result
