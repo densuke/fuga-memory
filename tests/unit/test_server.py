@@ -125,13 +125,13 @@ class TestSaveMemory:
         ids = {r1["id"], r2["id"], r3["id"]}
         assert len(ids) == 3  # 全て異なる ID
 
-    def test_save_empty_content_does_not_raise(
+    def test_save_empty_content_raises(
         self,
         server_deps: dict[str, Any],
     ) -> None:
-        """空文字列のコンテンツも保存できる（バリデーションは呼び出し側の責任）。"""
-        result = srv.save_memory("", "session-001")
-        assert result["status"] == "saved"
+        """空文字列のコンテンツは ValueError を発生させる。"""
+        with pytest.raises(ValueError, match="空文字列"):
+            srv.save_memory("", "session-001")
 
 
 # ---------------------------------------------------------------------------
@@ -299,3 +299,78 @@ class TestListSessions:
         assert len(sessions) >= 2
         assert sessions[0]["last_updated"] >= sessions[1]["last_updated"]
         assert sessions[0]["session_id"] == "session-new"
+
+
+# ---------------------------------------------------------------------------
+# バリデーション上限値のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestValidationLimits:
+    def test_save_memory_content_too_long_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """content が 100,000 文字を超えると ValueError。"""
+        oversized = "x" * (srv._MAX_CONTENT_LENGTH + 1)
+        with pytest.raises(ValueError, match="最大サイズ"):
+            srv.save_memory(oversized, "session-001")
+
+    def test_save_memory_content_at_max_length_succeeds(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """content がちょうど 100,000 文字なら保存できる。"""
+        exact = "x" * srv._MAX_CONTENT_LENGTH
+        result = srv.save_memory(exact, "session-001")
+        assert result["status"] == "saved"
+
+    def test_search_memory_query_too_long_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """query が 4,096 文字を超えると ValueError。"""
+        long_query = "q" * (srv._MAX_QUERY_LENGTH + 1)
+        with pytest.raises(ValueError, match="最大長"):
+            srv.search_memory(long_query)
+
+    def test_search_memory_query_at_max_length_succeeds(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """query がちょうど 4,096 文字なら実行できる。"""
+        exact_query = "q" * srv._MAX_QUERY_LENGTH
+        results = srv.search_memory(exact_query)
+        assert isinstance(results, list)
+
+    def test_search_memory_top_k_over_limit_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """top_k が上限（100）を超えると ValueError。"""
+        with pytest.raises(ValueError, match=str(srv._MAX_TOP_K)):
+            srv.search_memory("クエリ", top_k=srv._MAX_TOP_K + 1)
+
+    def test_search_memory_top_k_at_limit_succeeds(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """top_k がちょうど上限（100）なら実行できる。"""
+        results = srv.search_memory("クエリ", top_k=srv._MAX_TOP_K)
+        assert isinstance(results, list)
+
+    def test_list_sessions_limit_over_max_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """limit が上限（200）を超えると ValueError。"""
+        with pytest.raises(ValueError, match=str(srv._MAX_LIMIT)):
+            srv.list_sessions(limit=srv._MAX_LIMIT + 1)
+
+    def test_list_sessions_limit_at_max_succeeds(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """limit がちょうど上限（200）なら実行できる。"""
+        result = srv.list_sessions(limit=srv._MAX_LIMIT)
+        assert isinstance(result, list)

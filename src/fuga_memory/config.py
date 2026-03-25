@@ -15,11 +15,35 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+# HuggingFace モデルID形式: "org/model-name" または "model-name"
+# ASCII 英数字・ハイフン・アンダースコア・ドット・スラッシュのみ許可（Unicode 除外）
+_MODEL_NAME_PATTERN = re.compile(r"^[\w][\w\-\.]*(/[\w][\w\-\.]*)?$", re.ASCII)
+
+
+def _validate_model_name(model_name: str) -> str:
+    """model_name がパストラバーサルを含まない安全な値であることを検証する。
+
+    Args:
+        model_name: 検証するモデル名
+
+    Returns:
+        検証済みのモデル名
+
+    Raises:
+        ValueError: 不正な形式の場合
+    """
+    if ".." in model_name:
+        raise ValueError(f"model_name に '..' を含めることはできません: {model_name!r}")
+    if not _MODEL_NAME_PATTERN.match(model_name):
+        raise ValueError(f"model_name の形式が不正です（例: 'org/model-name'）: {model_name!r}")
+    return model_name
 
 
 def _default_db_path() -> Path:
@@ -88,9 +112,9 @@ def _apply_toml(config: Config, path: Path) -> Config:
     updates: dict[str, Any] = {}
 
     if "db_path" in values:
-        updates["db_path"] = Path(str(values["db_path"])).expanduser()
+        updates["db_path"] = Path(str(values["db_path"])).expanduser().resolve()
     if "model_name" in values:
-        updates["model_name"] = str(values["model_name"])
+        updates["model_name"] = _validate_model_name(str(values["model_name"]))
     if "thread_workers" in values:
         updates["thread_workers"] = _parse_int(
             values["thread_workers"], "thread_workers", path, min_val=1
@@ -128,10 +152,10 @@ def _apply_env(config: Config) -> Config:
     updates: dict[str, Any] = {}
 
     if db_path_str := os.environ.get("FUGA_MEMORY_DB_PATH"):
-        updates["db_path"] = Path(db_path_str).expanduser()
+        updates["db_path"] = Path(db_path_str).expanduser().resolve()
 
     if model_name_env := os.environ.get("FUGA_MEMORY_MODEL_NAME"):
-        updates["model_name"] = model_name_env
+        updates["model_name"] = _validate_model_name(model_name_env)
 
     _parse_env_int(updates, "FUGA_MEMORY_THREAD_WORKERS", "thread_workers", min_val=1)
     _parse_env_int(updates, "FUGA_MEMORY_RRF_K", "rrf_k", min_val=0)

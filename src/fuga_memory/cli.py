@@ -15,6 +15,38 @@ import click
 
 from fuga_memory import server as _server
 
+_MAX_INPUT_BYTES = 1_048_576  # 1MB
+
+
+def _read_stdin_limited(max_bytes: int = _MAX_INPUT_BYTES) -> str:
+    """stdin をチャンク読み込みし、上限を超えた場合はエラーを発生させる。
+
+    Args:
+        max_bytes: 読み込み上限バイト数
+
+    Returns:
+        読み込んだテキスト
+
+    Raises:
+        click.UsageError: 入力が上限を超えた場合
+    """
+    raw_chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = sys.stdin.buffer.read(8192)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise click.UsageError(f"入力が最大サイズ（{max_bytes:,} バイト）を超えています")
+        raw_chunks.append(chunk)
+    try:
+        return b"".join(raw_chunks).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise click.UsageError(
+            f"入力のデコードに失敗しました（UTF-8ではありません）: {exc}"
+        ) from exc
+
 
 @click.group()
 def main() -> None:
@@ -96,9 +128,21 @@ def save(
         raise click.UsageError("content 引数、--stdin、--file のいずれかを指定してください。")
 
     if read_stdin:
-        body = sys.stdin.read()
+        body = _read_stdin_limited()
     elif file_path is not None:
-        body = file_path.read_text()
+        # stat() は /dev/zero 等の特殊ファイルで不正確なため、実際に読んでバイト数を確認する
+        with file_path.open("rb") as f:
+            raw = f.read(_MAX_INPUT_BYTES + 1)
+        if len(raw) > _MAX_INPUT_BYTES:
+            raise click.UsageError(
+                f"ファイルが最大サイズ（{_MAX_INPUT_BYTES:,} バイト）を超えています"
+            )
+        try:
+            body = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise click.UsageError(
+                f"ファイルのデコードに失敗しました（UTF-8ではありません）: {exc}"
+            ) from exc
     else:
         body = str(content)
 
