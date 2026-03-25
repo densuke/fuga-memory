@@ -130,13 +130,19 @@ def save(
     if read_stdin:
         body = _read_stdin_limited()
     elif file_path is not None:
-        file_size = file_path.stat().st_size
-        if file_size > _MAX_INPUT_BYTES:
+        # stat() は /dev/zero 等の特殊ファイルで不正確なため、実際に読んでバイト数を確認する
+        with file_path.open("rb") as f:
+            raw = f.read(_MAX_INPUT_BYTES + 1)
+        if len(raw) > _MAX_INPUT_BYTES:
             raise click.UsageError(
-                f"ファイルが最大サイズ（{_MAX_INPUT_BYTES:,} バイト）を超えています: "
-                f"{file_size:,} バイト"
+                f"ファイルが最大サイズ（{_MAX_INPUT_BYTES:,} バイト）を超えています"
             )
-        body = file_path.read_text(encoding="utf-8")
+        try:
+            body = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise click.UsageError(
+                f"ファイルのデコードに失敗しました（UTF-8ではありません）: {exc}"
+            ) from exc
     else:
         body = str(content)
 

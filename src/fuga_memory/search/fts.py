@@ -69,8 +69,10 @@ def search_fts(
         return [dict(row) for row in cur.fetchall()]
     except sqlite3.OperationalError as exc:
         msg = str(exc).lower()
-        # FTS5 の構文エラーのみフォールバック。DB ロック等の運用障害は再送出する。
-        if "fts5" in msg or "syntax error" in msg:
+        # FTS5 クエリの構文エラーのみフォールバック。
+        # "fts5" はインデックス破損でも出るため使わず、構文エラー固有のメッセージに絞る。
+        # DB ロック・破損等の運用障害は再送出して呼び出し元に通知する。
+        if "syntax error" in msg or "parse" in msg or "malformed" in msg:
             logger.warning("FTS5 構文エラーが発生しました（クエリ長: %d文字）", len(sanitized))
             return []
         raise

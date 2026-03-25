@@ -325,6 +325,24 @@ class TestValidationLimits:
         result = srv.save_memory(exact, "session-001")
         assert result["status"] == "saved"
 
+    def test_search_memory_query_too_long_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """query が 4,096 文字を超えると ValueError。"""
+        long_query = "q" * (srv._MAX_QUERY_LENGTH + 1)
+        with pytest.raises(ValueError, match="最大長"):
+            srv.search_memory(long_query)
+
+    def test_search_memory_query_at_max_length_succeeds(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """query がちょうど 4,096 文字なら実行できる。"""
+        exact_query = "q" * srv._MAX_QUERY_LENGTH
+        results = srv.search_memory(exact_query)
+        assert isinstance(results, list)
+
     def test_search_memory_top_k_over_limit_raises(
         self,
         server_deps: dict[str, Any],

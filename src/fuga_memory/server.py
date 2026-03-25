@@ -25,7 +25,8 @@ from fuga_memory.search.vector import search_vector
 logger = logging.getLogger(__name__)
 
 # 入力値の上限定数
-_MAX_CONTENT_LENGTH = 100_000  # 100KB
+_MAX_CONTENT_LENGTH = 100_000  # 100,000文字（マルチバイト含む）
+_MAX_QUERY_LENGTH = 4_096  # 検索クエリの最大文字数
 _MAX_TOP_K = 100
 _MAX_LIMIT = 200
 
@@ -117,8 +118,11 @@ def search_memory(query: str, top_k: int = 5) -> list[dict[str, Any]]:
         score の降順でソート済み。
 
     Raises:
-        ValueError: top_k が 1 未満または {_MAX_TOP_K} 超の場合。
+        ValueError: query が 4,096 文字を超える場合、top_k が 1 未満または 100 超の場合。
     """
+    if len(query) > _MAX_QUERY_LENGTH:
+        logger.warning("search_memory: query サイズ超過 (%d文字)", len(query))
+        raise ValueError(f"query が最大長を超えています: {len(query)} > {_MAX_QUERY_LENGTH}")
     if top_k < 1:
         raise ValueError(f"top_k は 1 以上である必要があります: {top_k}")
     if top_k > _MAX_TOP_K:
@@ -152,7 +156,7 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
         [{"session_id", "memory_count", "last_updated"}, ...]
 
     Raises:
-        ValueError: limit が 1 未満または {_MAX_LIMIT} 超の場合。
+        ValueError: limit が 1 未満または 200 超の場合。
     """
     if limit < 1:
         raise ValueError(f"limit は 1 以上である必要があります: {limit}")
