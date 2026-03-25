@@ -258,6 +258,20 @@ DB ファイルは SQLite 単一ファイルです。バックアップは `cp m
 - sentence-transformers + cl-nagoya/ruri-v3-310m（ONNX バックエンド）
 - ThreadPoolExecutor + asyncio
 
+## インスピレーション
+
+このプロジェクトは、noprogllama 氏による Zenn 記事
+
+**[Claude Codeに長期記憶を持たせたら、壁打ちの質が変わった](https://zenn.dev/noprogllama/articles/7c24b2c2410213)**
+
+にインスパイアされて開発しました。
+
+同記事では、SQLite 単一ファイルへの格納、FTS5 + ベクトル検索のハイブリッド化、RRF による統合、時間減衰スコアリングといった設計思想が紹介されています。fuga-memory はこれらのアイデアを出発点として、Python + fastmcp による実装、セキュリティ強化、設定の柔軟化などを加えた独自の実装です。
+
+優れた設計思想を公開してくださった noprogllama 氏に感謝します。
+
+---
+
 ## ライセンス
 
 MIT
