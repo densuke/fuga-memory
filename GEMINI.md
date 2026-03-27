@@ -1,18 +1,18 @@
-# Gemini CLI Usage Guide for fuga-memory
+# fuga-memory: Gemini CLI 利用ガイド
 
-This guide explains how to use **fuga-memory** as a Long-Term Memory MCP server specifically for [Gemini CLI](https://github.com/google/gemini-cli).
+このガイドでは、[Gemini CLI](https://github.com/google/gemini-cli) で長期記憶 MCP サーバー **fuga-memory** を使用する方法について説明します。
 
-## 1. Setup
+## 1. セットアップ
 
-### Prerequisites
+### 前提条件
 
-- [uv](https://docs.astral.sh/uv/) installed.
-- `fuga-memory` repository cloned.
-- **Run `uv sync` inside the cloned `fuga-memory` directory.**
+- [uv](https://docs.astral.sh/uv/) がインストールされていること。
+- `fuga-memory` リポジトリをクローン済みであること。
+- **クローンした `fuga-memory` ディレクトリ内で `uv sync` を実行済みであること。**
 
-### Configuration
+### 設定
 
-Add `fuga-memory` to your Gemini CLI settings file located at `~/.gemini/settings.json`.
+Gemini CLI の設定ファイル（通常は `~/.gemini/settings.json`）に `fuga-memory` を追加します。
 
 ```json
 {
@@ -31,54 +31,54 @@ Add `fuga-memory` to your Gemini CLI settings file located at `~/.gemini/setting
 }
 ```
 
-Replace `/path/to/fuga-memory` with the absolute path to your cloned repository.
+`/path/to/fuga-memory` は、クローンしたリポジトリの絶対パスに置き換えてください。
 
-## 2. Available Tools
+## 2. 利用可能なツール
 
-Once configured, Gemini CLI will have access to the following tools:
+設定が完了すると、Gemini CLI から以下のツールが利用可能になります。
 
 ### `save_memory`
-Saves a new memory to the database.
+新しい記憶をデータベースに保存します。
 
-- **`content`** (string, required): The text content to remember.
-- **`session_id`** (string, required): A unique identifier for the current session.
-- **`source`** (string, optional): Where the memory came from (defaults to `"manual"`).
+- **`content`** (string, 必須): 記憶するテキスト内容。
+- **`session_id`** (string, 必須): 現在のセッションを一意に識別する ID。
+- **`source`** (string, 任意): 記憶のソース（デフォルトは `"manual"`）。
 
-**Example:**
-> Gemini, remember that I prefer using Python for data analysis.
-> (Gemini will call `save_memory(content="User prefers using Python for data analysis.", session_id="...")`)
+**例:**
+> 「データ分析には Python を使うのが好みだと覚えておいて」
+> （Gemini が `save_memory(content="ユーザーはデータ分析に Python を使うことを好む", session_id="...")` を呼び出します）
 
 ### `search_memory`
-Searches for relevant memories using hybrid search (Full-Text Search + Vector Search).
+ハイブリッド検索（全文検索 + ベクトル検索）を使用して、関連する記憶を検索します。
 
-- **`query`** (string, required): The search term or question.
-- **`top_k`** (integer, optional): Maximum number of results to return (defaults to 5).
+- **`query`** (string, 必須): 検索ワードまたは質問。
+- **`top_k`** (integer, 任意): 返す結果の最大件数（デフォルトは 5）。
 
-**Example:**
-> What are my preferences for data analysis?
-> (Gemini will call `search_memory(query="data analysis preferences")`)
+**例:**
+> 「データ分析に関する私の好みは何？」
+> （Gemini が `search_memory(query="データ分析の好み")` を呼び出します）
 
 ### `list_sessions`
-Lists the sessions that have stored memories.
+記憶が保存されているセッションの一覧を表示します。
 
-- **`limit`** (integer, optional): Maximum number of sessions to list (defaults to 20).
+- **`limit`** (integer, 任意): 表示するセッションの最大件数（デフォルトは 20）。
 
-## 3. Session-Based Memory Management
+## 3. セッションベースの記憶管理
 
-`fuga-memory` is designed to organize memories by `session_id`. When using Gemini CLI, you can use the session ID to keep track of context within a specific project or conversation.
+`fuga-memory` は `session_id` ごとに記憶を整理するように設計されています。Gemini CLI を使用する場合、セッション ID を使用して特定のプロジェクトや会話のコンテキストを追跡できます。
 
-### Automated Context Injection
+### 自動コンテキスト注入
 
-You can instruct Gemini to always look up relevant memories at the start of a session:
+セッションの開始時に、関連する記憶を検索するように Gemini に指示できます。
 
-> "Search my memories for any context related to the current project."
+> 「現在のプロジェクトに関連するコンテキストを記憶から検索して」
 
-### Session Identification
+### セッション識別
 
-Gemini CLI provides session-specific environment variables that can be used if you are running custom scripts, though typically the agent handles the `session_id` automatically when calling the MCP tools.
+Gemini CLI は、エージェントが MCP ツールを呼び出す際に自動的に `session_id` を処理しますが、カスタムスクリプトを実行する場合などは、セッション固有の環境変数を利用することも可能です。
 
-## 4. Tips for Gemini CLI Users
+## 4. Gemini CLI ユーザーへのヒント
 
-- **Be Descriptive**: The more context you provide in `save_memory`, the better the hybrid search will perform.
-- **Hybrid Search Power**: `fuga-memory` combines keyword matching (FTS5) with semantic understanding (Vector Search), making it very robust for retrieving information even if you don't use the exact same words.
-- **Decay System**: Remember that `fuga-memory` has a time-decay feature (default half-life of 30 days). Older memories will naturally have lower scores unless they are highly relevant to your query.
+- **具体的に記述する**: `save_memory` で提供するコンテキストが具体的なほど、ハイブリッド検索の精度が向上します。
+- **ハイブリッド検索の活用**: `fuga-memory` はキーワード一致（FTS5）と意味理解（ベクトル検索）を組み合わせています。全く同じ言葉を使わなくても、関連情報を柔軟に取得できます。
+- **時間減衰システム**: `fuga-memory` には時間減衰機能（デフォルトの半減期は 30 日）があります。古い記憶は、クエリに対する関連性が非常に高い場合を除き、自然にスコアが低下します。
