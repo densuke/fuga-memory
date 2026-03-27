@@ -8,6 +8,33 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
+## 2026-03-27
+
+### docs: Gemini CLI 利用ガイドの日本語化
+
+`GEMINI.md` の内容を日本語に翻訳。Gemini CLI ユーザーが設定・利用方法を母国語で確認できるように改善しました。
+
+### docs: セキュリティ監査レポートを追加 (#11)
+
+プロジェクト全体のセキュリティ監査を実施し、結果を `SECURITY_AUDIT.md` にまとめました。
+
+- **SQL インジェクション**: パラメータ化クエリと FTS5 サニタイズにより安全であることを確認
+- **パストラバーサル**: モデル名バリデーション等により安全であることを確認
+- **リソース制限**: 入力文字数・ファイルサイズの上限設定を確認
+- **データ保護**: SQLite 非暗号化の現状と SQLCipher 等の推奨事項を記載
+- 監査日のプレースホルダ化（レビュー指摘対応）
+
+### docs: Gemini CLI 向けセットアップガイドを追加 (#10)
+
+Gemini CLI で `fuga-memory` を MCP サーバーとして利用するための専用ドキュメント `GEMINI.md` を追加。
+
+- `~/.gemini/settings.json` への登録方法を明示
+- `save_memory` / `search_memory` / `list_sessions` の Gemini CLI での活用例を記載
+- セットアップ手順の明確化（レビュー指摘対応: `uv sync` の実行場所を明示）
+- `README.md` のセットアップガイド見出しを日本語化
+
+---
+
 ## 2026-03-25
 
 ### feat: CLI の timestamp 表示をローカルタイムに変換 (#8)
