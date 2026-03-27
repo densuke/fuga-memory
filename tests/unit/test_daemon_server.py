@@ -261,8 +261,13 @@ class TestWatchdog:
         # クリーンアップ
         with server._lock:
             server._pending -= 1
-        urllib.request.urlopen(
-            urllib.request.Request(f"http://127.0.0.1:{port}/shutdown", method="POST"),
-            timeout=2,
-        )
+        # pending 減少後、watchdog がアイドルタイムアウトを検知してシャットダウンする場合がある。
+        # その場合、/shutdown への POST は既に閉じたソケットに接触するため例外を抑制する。
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            urllib.request.urlopen(
+                urllib.request.Request(f"http://127.0.0.1:{port}/shutdown", method="POST"),
+                timeout=2,
+            )
         t.join(timeout=5)

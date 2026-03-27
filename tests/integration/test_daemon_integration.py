@@ -111,8 +111,9 @@ class TestDaemonSaveIntegration:
     def test_save_actually_persists_to_db(self, running_daemon: Config) -> None:
         """POST /save 後にバックグラウンド処理が完了し、DB にレコードが書き込まれる。
 
-        ModelLoader をモックすることでモデルロード時間を排除し、
+        _do_save_task をモックすることで ModelLoader のロードを排除し、
         HTTP→バックグラウンドタスク→DB 書き込みのフローを検証する。
+        モック内で実際の DB 書き込みを行うため、ストレージ層の動作も確認できる。
         """
         import numpy as np
 
@@ -124,11 +125,21 @@ class TestDaemonSaveIntegration:
             def encode(self, text: str) -> list[float]:
                 return rng.random(768).astype(np.float32).tolist()
 
-        mock_encoder = _MockEncoder()
+        def _fake_save_task(content: str, session_id: str, source: str, config: Config) -> None:
+            """ModelLoader を使わずに直接 DB に書き込む代替実装。"""
+            from fuga_memory.db.connection import get_connection
+            from fuga_memory.db.repository import MemoryRepository
+            from fuga_memory.db.schema import initialize_schema
 
-        with patch("fuga_memory.embedding.loader.ModelLoader") as mock_loader_cls:
-            mock_loader_cls.return_value.get_encoder.return_value = mock_encoder
+            conn = get_connection(config.db_path)
+            initialize_schema(conn)
+            repo = MemoryRepository(conn, _MockEncoder())
+            repo.save(content, session_id, source)
 
+        db_path = running_daemon.db_path
+        row = None
+
+        with patch("fuga_memory.daemon.server._do_save_task", side_effect=_fake_save_task):
             send_save_request(
                 content="DB書き込み統合テスト",
                 session_id="it-session-db",
@@ -137,9 +148,7 @@ class TestDaemonSaveIntegration:
             )
 
             # バックグラウンド処理の完了を待つ（最大10秒）
-            db_path = running_daemon.db_path
             deadline = time.monotonic() + 10.0
-            row = None
             while time.monotonic() < deadline:
                 try:
                     conn = sqlite3.connect(str(db_path))
