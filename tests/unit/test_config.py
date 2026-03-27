@@ -157,6 +157,12 @@ class TestConfigLoadFromToml:
         with pytest.raises(ValueError, match="daemon_idle_timeout"):
             Config.load(config_path=toml_file)
 
+    def test_daemon_port_above_65535_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndaemon_port = 65536\n")
+        with pytest.raises(ValueError, match="daemon_port"):
+            Config.load(config_path=toml_file)
+
     def test_missing_explicit_config_file_uses_defaults(self, tmp_path: Path) -> None:
         missing = tmp_path / "nonexistent.toml"
         config = Config.load(config_path=missing)
@@ -321,6 +327,13 @@ class TestConfigEnvOverride:
     ) -> None:
         monkeypatch.setenv("FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "0")
         with pytest.raises(ValueError, match="FUGA_MEMORY_DAEMON_IDLE_TIMEOUT"):
+            Config.load(config_path=self._no_file(tmp_path))
+
+    def test_daemon_port_above_65535_raises_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DAEMON_PORT", "65536")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_DAEMON_PORT"):
             Config.load(config_path=self._no_file(tmp_path))
 
     def test_defaults_when_env_not_set(
