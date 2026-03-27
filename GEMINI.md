@@ -7,7 +7,8 @@ This guide explains how to use **fuga-memory** as a Long-Term Memory MCP server 
 ### Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) installed.
-- `fuga-memory` repository cloned and synced (`uv sync`).
+- `fuga-memory` repository cloned.
+- **Run `uv sync` inside the cloned `fuga-memory` directory.**
 
 ### Configuration
 

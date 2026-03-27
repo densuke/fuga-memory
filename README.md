@@ -13,10 +13,10 @@ Claude Code（および他の LLM）向け長期記憶 MCP サーバー。
 - **MCP 対応**: Claude Code / Gemini / Copilot など複数 LLM で共有可能
 - **自動保存**: Claude Code の Stop フックでセッション終了時に自動保存
 
-## Usage Guides
+## セットアップガイド
 
-- [Claude Code Setup (README)](README.md)
-- [Gemini CLI Setup (GEMINI.md)](GEMINI.md)
+- [Claude Code での設定 (README)](README.md)
+- [Gemini CLI での設定 (GEMINI.md)](GEMINI.md)
 
 ---
 
