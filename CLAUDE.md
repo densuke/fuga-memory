@@ -130,9 +130,9 @@ tests/
 設定ファイル（`config.toml`）または環境変数で変更可能:
 
 ```toml
-[daemon]
-port = 18520          # デーモンの待ち受けポート（デフォルト: 18520）
-idle_timeout = 600    # アイドル自動終了までの秒数（デフォルト: 600秒=10分）
+[fuga-memory]
+daemon_port = 18520          # デーモンの待ち受けポート（デフォルト: 18520）
+daemon_idle_timeout = 600    # アイドル自動終了までの秒数（デフォルト: 600秒=10分）
 ```
 
 環境変数: `FUGA_MEMORY_DAEMON_PORT`、`FUGA_MEMORY_DAEMON_IDLE_TIMEOUT`

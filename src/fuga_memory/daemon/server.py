@@ -19,6 +19,7 @@ from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from fuga_memory.config import Config
+from fuga_memory.embedding.encoder import Encoder
 
 logger = logging.getLogger(__name__)
 
@@ -28,23 +29,43 @@ _WATCHDOG_INTERVAL = 10.0
 # /save エンドポイントが受け付けるコンテンツの最大バイト数（cli.py の _MAX_INPUT_BYTES と統一）
 _MAX_CONTENT_BYTES = 1_048_576  # 1MB
 
+# デーモンプロセス全体でエンコーダを1回だけロードしてキャッシュする。
+# モデル名をキーとし、初回リクエスト時に遅延ロードする。
+_encoder_cache: dict[str, Encoder] = {}
+_encoder_lock = threading.Lock()
+
+
+def _get_or_load_encoder(model_name: str, thread_workers: int) -> Encoder:
+    """エンコーダをキャッシュから返す。未ロードなら ModelLoader でロードしてキャッシュする。
+
+    スレッドセーフ（double-checked locking）。
+    """
+    if model_name not in _encoder_cache:
+        with _encoder_lock:
+            if model_name not in _encoder_cache:
+                from fuga_memory.embedding.loader import ModelLoader
+
+                loader = ModelLoader(model_name, thread_workers)
+                _encoder_cache[model_name] = loader.get_encoder()
+                logger.info("埋め込みモデルのロード完了: %s", model_name)
+    return _encoder_cache[model_name]
+
 
 def _do_save_task(content: str, session_id: str, source: str, config: Config) -> None:
     """バックグラウンドで save_memory を呼び出す。
 
     この関数はスレッドプールから実行される。例外はログに記録してサイレント処理する。
+    エンコーダはプロセス内でキャッシュされるため、2回目以降はロード不要。
     """
     try:
         from fuga_memory.db.connection import get_connection
         from fuga_memory.db.repository import MemoryRepository
         from fuga_memory.db.schema import initialize_schema
-        from fuga_memory.embedding.loader import ModelLoader
 
         conn = get_connection(config.db_path)
-        initialize_schema(conn)
-        loader = ModelLoader(config.model_name, config.thread_workers)
-        encoder = loader.get_encoder()
-        repo = MemoryRepository(conn, encoder)
+        initialize_schema(conn, config.embedding_dim)
+        encoder = _get_or_load_encoder(config.model_name, config.thread_workers)
+        repo = MemoryRepository(conn, encoder, config.embedding_dim)
         repo.save(content, session_id, source)
         logger.debug("保存完了: session_id=%s source=%s", session_id, source)
     except Exception:
@@ -83,11 +104,19 @@ class DaemonServer:
         self._watchdog_interval = watchdog_interval
 
         # ログ設定
+        # 同一プロセスで複数回 DaemonServer が生成されてもハンドラを重複追加しない
         log_path = config.db_path.parent / "daemon.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(log_path, encoding="utf-8")
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-        logging.getLogger("fuga_memory").addHandler(handler)
+        fuga_logger = logging.getLogger("fuga_memory")
+        for existing in fuga_logger.handlers:
+            if isinstance(existing, logging.FileHandler) and getattr(
+                existing, "baseFilename", None
+            ) == str(log_path):
+                break
+        else:
+            file_handler = logging.FileHandler(log_path, encoding="utf-8")
+            file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            fuga_logger.addHandler(file_handler)
 
     def start(self) -> None:
         """サーバーを起動してブロックする。シグナルまたは shutdown() で終了する。"""
@@ -103,6 +132,7 @@ class DaemonServer:
         try:
             server.serve_forever()
         finally:
+            server.server_close()
             logger.info("デーモン停止")
 
     def _make_handler(self) -> type[BaseHTTPRequestHandler]:

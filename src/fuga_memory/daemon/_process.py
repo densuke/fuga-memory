@@ -31,13 +31,15 @@ def spawn_daemon_process(port: int) -> None:
         # CREATE_NEW_PROCESS_GROUP: 親の Ctrl+C シグナルを受け取らない
         DETACHED_PROCESS = 0x00000008
         CREATE_NEW_PROCESS_GROUP = 0x00000200
+        # Windows では stdin/stdout/stderr をリダイレクトする場合、
+        # close_fds=True を指定すると ValueError になるため省略する。
+        # Windows のデフォルトは close_fds=False であり省略で正しい。
         subprocess.Popen(
             cmd,
             creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            close_fds=True,
         )
     else:
         subprocess.Popen(
