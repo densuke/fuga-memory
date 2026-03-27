@@ -30,7 +30,7 @@ def _is_daemon_healthy(port: int) -> bool:
                 return False
             body: dict[str, object] = json.loads(resp.read())
             return body.get("app") == "fuga-memory"
-    except Exception:
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
         return False
 
 
