@@ -237,6 +237,12 @@ class TestWatchdog:
             port, idle_timeout=1, tmp_db=tmp_path / "test.db", watchdog_interval=0.1
         )
 
+        # スレッド起動前に pending を設定しておく。
+        # こうすることで、CI 環境で起動に1秒以上かかっても
+        # watchdog が早期シャットダウンするのを防ぐ。
+        with server._lock:
+            server._pending += 1
+
         t = threading.Thread(target=server.start, daemon=True)
         t.start()
 
@@ -248,10 +254,6 @@ class TestWatchdog:
                     break
             except Exception:
                 time.sleep(0.05)
-
-        # pending を人工的に増やす
-        with server._lock:
-            server._pending += 1
 
         time.sleep(2)  # アイドルタイムアウト + マージン
 

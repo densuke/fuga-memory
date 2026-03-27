@@ -306,7 +306,7 @@ class TestSaveCommand:
         srv._encoder = mock_encoder  # type: ignore[attr-defined]
 
         content_file = tmp_path / "memory.txt"
-        content_file.write_text("ファイルからのテスト記憶")
+        content_file.write_text("ファイルからのテスト記憶", encoding="utf-8")
 
         from fuga_memory.cli import main
 

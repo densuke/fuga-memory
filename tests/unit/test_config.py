@@ -13,7 +13,8 @@ from fuga_memory.config import Config, config_file_paths
 class TestConfigDefaults:
     def test_db_path_default_is_under_local_share(self) -> None:
         config = Config()
-        assert ".local/share/fuga-memory" in str(config.db_path)
+        # as_posix() でパス区切りを統一してクロスプラットフォーム比較する
+        assert ".local/share/fuga-memory" in config.db_path.as_posix()
 
     def test_db_filename_is_memories_db(self) -> None:
         config = Config()
@@ -71,7 +72,7 @@ class TestConfigFilePaths:
     def test_macos_appdata_is_first_on_darwin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "darwin")
         paths = config_file_paths()
-        assert "Library/Application Support" in str(paths[0])
+        assert "Library/Application Support" in paths[0].as_posix()
 
     def test_non_darwin_does_not_include_appdata(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "platform", "linux")
@@ -81,12 +82,12 @@ class TestConfigFilePaths:
     def test_xdg_config_home_is_respected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("XDG_CONFIG_HOME", "/custom/config")
         paths = config_file_paths()
-        assert any("/custom/config" in str(p) for p in paths)
+        assert any("/custom/config" in p.as_posix() for p in paths)
 
     def test_default_xdg_path_when_env_not_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         paths = config_file_paths()
-        assert any(".config/fuga-memory" in str(p) for p in paths)
+        assert any(".config/fuga-memory" in p.as_posix() for p in paths)
 
     def test_home_dotfile_is_always_last(self) -> None:
         paths = config_file_paths()
@@ -183,9 +184,12 @@ class TestConfigLoadFromToml:
 
     def test_toml_syntax_error_includes_path(self, tmp_path: Path) -> None:
         """TOML 構文エラー時にファイルパスを含むエラーになる。"""
+        import re
+
         bad_toml = tmp_path / "bad.toml"
         bad_toml.write_text("invalid toml [[[")
-        with pytest.raises(ValueError, match=str(bad_toml)):
+        # Windows パスにはバックスラッシュが含まれるため re.escape でエスケープする
+        with pytest.raises(ValueError, match=re.escape(str(bad_toml))):
             Config.load(config_path=bad_toml)
 
     def test_toml_thread_workers_zero_raises(self, tmp_path: Path) -> None:
