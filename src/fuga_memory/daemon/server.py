@@ -15,6 +15,7 @@ import json
 import logging
 import threading
 import time
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from fuga_memory.config import Config
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 # watchdog が確認する間隔（秒）。テストでは短くするために公開している。
 _WATCHDOG_INTERVAL = 10.0
+
+# /save エンドポイントが受け付けるコンテンツの最大バイト数（cli.py の _MAX_INPUT_BYTES と統一）
+_MAX_CONTENT_BYTES = 1_048_576  # 1MB
 
 
 def _do_save_task(content: str, session_id: str, source: str, config: Config) -> None:
@@ -45,6 +49,18 @@ def _do_save_task(content: str, session_id: str, source: str, config: Config) ->
         logger.debug("保存完了: session_id=%s source=%s", session_id, source)
     except Exception:
         logger.exception("バックグラウンド保存中にエラーが発生しました")
+
+
+def _write_json_response(
+    handler: BaseHTTPRequestHandler, status: int, body: dict[str, object]
+) -> None:
+    """JSON レスポンスを書き出すヘルパー。"""
+    raw = json.dumps(body).encode()
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(raw)))
+    handler.end_headers()
+    handler.wfile.write(raw)
 
 
 class DaemonServer:
@@ -91,6 +107,8 @@ class DaemonServer:
 
     def _make_handler(self) -> type[BaseHTTPRequestHandler]:
         """DaemonHandler のクラスを生成する（server インスタンスをクロージャで渡す）。"""
+        # BaseHTTPRequestHandler のサブクラス内では self がハンドラインスタンスを指すため、
+        # DaemonServer インスタンスを `daemon` という別名でクロージャに渡す。
         daemon = self
 
         class DaemonHandler(BaseHTTPRequestHandler):
@@ -98,7 +116,7 @@ class DaemonServer:
                 if self.path == "/health":
                     daemon._handle_health(self)
                 else:
-                    self._send_error(404, "Not Found")
+                    _write_json_response(self, 404, {"error": "Not Found"})
 
             def do_POST(self) -> None:
                 if self.path == "/save":
@@ -106,15 +124,7 @@ class DaemonServer:
                 elif self.path == "/shutdown":
                     daemon._handle_shutdown(self)
                 else:
-                    self._send_error(404, "Not Found")
-
-            def _send_error(self, code: int, message: str) -> None:
-                body = json.dumps({"error": message}).encode()
-                self.send_response(code)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                    _write_json_response(self, 404, {"error": "Not Found"})
 
             def log_message(self, format: str, *args: object) -> None:
                 logger.debug(format, *args)
@@ -124,25 +134,11 @@ class DaemonServer:
     def _handle_health(self, handler: BaseHTTPRequestHandler) -> None:
         with self._lock:
             pending = self._pending
-        body = json.dumps({"app": "fuga-memory", "pending": pending}).encode()
-        handler.send_response(200)
-        handler.send_header("Content-Type", "application/json")
-        handler.send_header("Content-Length", str(len(body)))
-        handler.end_headers()
-        handler.wfile.write(body)
+        _write_json_response(handler, 200, {"app": "fuga-memory", "pending": pending})
 
     def _handle_save(self, handler: BaseHTTPRequestHandler) -> None:
-        try:
-            length = int(handler.headers.get("Content-Length", "0"))
-            raw = handler.rfile.read(length)
-            payload: dict[str, object] = json.loads(raw)
-        except (ValueError, json.JSONDecodeError) as exc:
-            body = json.dumps({"error": str(exc)}).encode()
-            handler.send_response(400)
-            handler.send_header("Content-Type", "application/json")
-            handler.send_header("Content-Length", str(len(body)))
-            handler.end_headers()
-            handler.wfile.write(body)
+        payload = self._parse_save_request(handler)
+        if payload is None:
             return
 
         content = payload.get("content")
@@ -154,12 +150,7 @@ class DaemonServer:
             or not isinstance(session_id, str)
             or not isinstance(source, str)
         ):
-            body = json.dumps({"error": "content, session_id, source は必須です"}).encode()
-            handler.send_response(400)
-            handler.send_header("Content-Type", "application/json")
-            handler.send_header("Content-Length", str(len(body)))
-            handler.end_headers()
-            handler.wfile.write(body)
+            _write_json_response(handler, 400, {"error": "content, session_id, source は必須です"})
             return
 
         # 即座に 202 を返す
@@ -173,6 +164,33 @@ class DaemonServer:
         # 最終リクエスト時刻を更新
         with self._lock:
             self._last_request_time = time.monotonic()
+
+    def _parse_save_request(self, handler: BaseHTTPRequestHandler) -> dict[str, object] | None:
+        """リクエストボディを読み取って JSON をパースする。
+
+        サイズ超過または不正 JSON の場合はエラーレスポンスを送り None を返す。
+        """
+        try:
+            length = int(handler.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            _write_json_response(handler, 400, {"error": str(exc)})
+            return None
+
+        if length > _MAX_CONTENT_BYTES:
+            _write_json_response(
+                handler,
+                413,
+                {"error": f"リクエストサイズが上限（{_MAX_CONTENT_BYTES:,} バイト）を超えています"},
+            )
+            return None
+
+        try:
+            raw = handler.rfile.read(length)
+            result: dict[str, object] = json.loads(raw)
+            return result
+        except (ValueError, json.JSONDecodeError) as exc:
+            _write_json_response(handler, 400, {"error": str(exc)})
+            return None
 
     def _handle_shutdown(self, handler: BaseHTTPRequestHandler) -> None:
         handler.send_response(200)
@@ -221,9 +239,6 @@ def main() -> None:
     args = parser.parse_args()
 
     config = Config.load()
-    # コマンドライン引数のポートで上書き
-    from dataclasses import replace
-
     config = replace(config, daemon_port=args.port)
 
     server = DaemonServer(config)

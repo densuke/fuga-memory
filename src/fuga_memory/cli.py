@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from pathlib import Path
 import click
 
 from fuga_memory import server as _server
+from fuga_memory.config import Config
+from fuga_memory.daemon.client import send_save_request
 
 
 def _to_localtime(utc_str: str) -> str:
@@ -161,5 +164,11 @@ def save(
     else:
         body = str(content)
 
-    result = _server.save_memory(body, session_id=session_id, source=source)
-    click.echo(f"保存しました: id={result['id']}  status={result['status']}")
+    config = Config.load()
+    try:
+        send_save_request(body, session_id, source, config=config)
+        click.echo("保存キューに追加しました (バックグラウンド処理中)")
+    except Exception as exc:
+        logging.getLogger(__name__).warning("デーモン経由の保存に失敗、直接実行します: %s", exc)
+        result = _server.save_memory(body, session_id=session_id, source=source)
+        click.echo(f"保存しました: id={result['id']}  status={result['status']}")
