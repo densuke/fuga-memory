@@ -170,6 +170,15 @@ class TestSearchCommand:
 
 
 class TestSaveCommand:
+    @pytest.fixture(autouse=True)
+    def _daemon_unavailable(self) -> Generator[None]:
+        """デーモンが利用不可の状態をシミュレート（フォールバックパスをテスト）。"""
+        with patch(
+            "fuga_memory.cli.send_save_request",
+            side_effect=TimeoutError("daemon unavailable in test"),
+        ):
+            yield
+
     def test_save_stores_memory(
         self,
         runner: CliRunner,
@@ -356,6 +365,74 @@ class TestSaveCommand:
         )
         assert result.exit_code == 0
         assert result.output  # 確認メッセージが出力される
+
+
+# ---------------------------------------------------------------------------
+# save コマンド デーモン連携テスト
+# ---------------------------------------------------------------------------
+
+
+class TestSaveCommandDaemon:
+    """save コマンドがデーモン経由で動作することを確認するテスト。"""
+
+    def test_save_calls_send_save_request_via_daemon(self, runner: CliRunner) -> None:
+        """save コマンドが send_save_request を呼ぶ（デーモン経由）。"""
+        from fuga_memory.cli import main
+
+        with patch("fuga_memory.cli.send_save_request") as mock_send:
+            result = runner.invoke(main, ["save", "--session-id", "session-001", "デーモンテスト"])
+        assert result.exit_code == 0
+        mock_send.assert_called_once()
+        call_kwargs = mock_send.call_args
+        assert call_kwargs.args[0] == "デーモンテスト"
+        assert call_kwargs.args[1] == "session-001"
+
+    def test_save_daemon_outputs_queued_message(self, runner: CliRunner) -> None:
+        """デーモン経由の save は「キューに追加」メッセージを出力する。"""
+        from fuga_memory.cli import main
+
+        with patch("fuga_memory.cli.send_save_request"):
+            result = runner.invoke(
+                main, ["save", "--session-id", "session-001", "メッセージテスト"]
+            )
+        assert result.exit_code == 0
+        assert "キュー" in result.output or "バックグラウンド" in result.output
+
+    def test_save_falls_back_to_direct_when_daemon_fails(
+        self,
+        runner: CliRunner,
+        in_memory_conn: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """デーモン経由が失敗した場合は直接実行にフォールバックする。"""
+        import fuga_memory.server as srv
+
+        srv._conn = in_memory_conn  # type: ignore[attr-defined]
+        srv._encoder = mock_encoder  # type: ignore[attr-defined]
+
+        from fuga_memory.cli import main
+
+        with patch(
+            "fuga_memory.cli.send_save_request", side_effect=TimeoutError("daemon unavailable")
+        ):
+            result = runner.invoke(
+                main, ["save", "--session-id", "session-001", "フォールバックテスト"]
+            )
+        assert result.exit_code == 0
+        assert result.output  # フォールバックでも何らかの出力がある
+
+    def test_save_uses_config_daemon_port(self, runner: CliRunner) -> None:
+        """save コマンドが Config を渡して send_save_request を呼ぶ。"""
+        from fuga_memory.cli import main
+
+        with patch("fuga_memory.cli.send_save_request") as mock_send:
+            result = runner.invoke(main, ["save", "--session-id", "session-001", "ポートテスト"])
+        assert result.exit_code == 0
+        # config 引数が渡されていることを確認
+        from fuga_memory.config import Config
+
+        call_args = mock_send.call_args
+        assert isinstance(call_args.kwargs.get("config") or call_args.args[-1], Config)
 
 
 # ---------------------------------------------------------------------------
