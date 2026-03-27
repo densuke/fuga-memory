@@ -127,6 +127,14 @@ def _apply_toml(config: Config, path: Path) -> Config:
         )
     if "default_top_k" in values:
         updates["default_top_k"] = _parse_int(values["default_top_k"], "default_top_k", path)
+    if "daemon_port" in values:
+        updates["daemon_port"] = _parse_int(
+            values["daemon_port"], "daemon_port", path, min_val=1024
+        )
+    if "daemon_idle_timeout" in values:
+        updates["daemon_idle_timeout"] = _parse_int(
+            values["daemon_idle_timeout"], "daemon_idle_timeout", path, min_val=1
+        )
 
     return replace(config, **updates)
 
@@ -161,6 +169,8 @@ def _apply_env(config: Config) -> Config:
     _parse_env_int(updates, "FUGA_MEMORY_RRF_K", "rrf_k", min_val=0)
     _parse_env_int(updates, "FUGA_MEMORY_DECAY_HALFLIFE_DAYS", "decay_halflife_days", min_val=1)
     _parse_env_int(updates, "FUGA_MEMORY_DEFAULT_TOP_K", "default_top_k")
+    _parse_env_int(updates, "FUGA_MEMORY_DAEMON_PORT", "daemon_port", min_val=1024)
+    _parse_env_int(updates, "FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "daemon_idle_timeout", min_val=1)
 
     return replace(config, **updates)
 
@@ -174,6 +184,8 @@ class Config:
     rrf_k: int = 60
     decay_halflife_days: int = 30
     default_top_k: int = 5
+    daemon_port: int = 18520
+    daemon_idle_timeout: int = 600
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> Config:

@@ -43,6 +43,14 @@ class TestConfigDefaults:
         config = Config()
         assert config.default_top_k == 5
 
+    def test_daemon_port_default(self) -> None:
+        config = Config()
+        assert config.daemon_port == 18520
+
+    def test_daemon_idle_timeout_default(self) -> None:
+        config = Config()
+        assert config.daemon_idle_timeout == 600
+
 
 class TestConfigCustom:
     def test_custom_db_path(self, tmp_path: Path) -> None:
@@ -124,6 +132,30 @@ class TestConfigLoadFromToml:
         assert config.rrf_k == 42
         assert config.decay_halflife_days == 14
         assert config.default_top_k == 10
+
+    def test_daemon_port_from_toml(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndaemon_port = 19000\n")
+        config = Config.load(config_path=toml_file)
+        assert config.daemon_port == 19000
+
+    def test_daemon_idle_timeout_from_toml(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndaemon_idle_timeout = 300\n")
+        config = Config.load(config_path=toml_file)
+        assert config.daemon_idle_timeout == 300
+
+    def test_daemon_port_below_1024_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndaemon_port = 80\n")
+        with pytest.raises(ValueError, match="daemon_port"):
+            Config.load(config_path=toml_file)
+
+    def test_daemon_idle_timeout_zero_raises(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text("[fuga-memory]\ndaemon_idle_timeout = 0\n")
+        with pytest.raises(ValueError, match="daemon_idle_timeout"):
+            Config.load(config_path=toml_file)
 
     def test_missing_explicit_config_file_uses_defaults(self, tmp_path: Path) -> None:
         missing = tmp_path / "nonexistent.toml"
@@ -265,6 +297,32 @@ class TestConfigEnvOverride:
         with pytest.raises(ValueError, match="FUGA_MEMORY_DECAY_HALFLIFE_DAYS"):
             Config.load(config_path=self._no_file(tmp_path))
 
+    def test_daemon_port_from_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DAEMON_PORT", "19000")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.daemon_port == 19000
+
+    def test_daemon_idle_timeout_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "300")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.daemon_idle_timeout == 300
+
+    def test_daemon_port_below_1024_raises_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DAEMON_PORT", "80")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_DAEMON_PORT"):
+            Config.load(config_path=self._no_file(tmp_path))
+
+    def test_daemon_idle_timeout_zero_raises_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "0")
+        with pytest.raises(ValueError, match="FUGA_MEMORY_DAEMON_IDLE_TIMEOUT"):
+            Config.load(config_path=self._no_file(tmp_path))
+
     def test_defaults_when_env_not_set(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -275,11 +333,15 @@ class TestConfigEnvOverride:
             "FUGA_MEMORY_RRF_K",
             "FUGA_MEMORY_DECAY_HALFLIFE_DAYS",
             "FUGA_MEMORY_DEFAULT_TOP_K",
+            "FUGA_MEMORY_DAEMON_PORT",
+            "FUGA_MEMORY_DAEMON_IDLE_TIMEOUT",
         ):
             monkeypatch.delenv(key, raising=False)
         config = Config.load(config_path=self._no_file(tmp_path))
         assert config.model_name == "cl-nagoya/ruri-v3-310m"
         assert config.rrf_k == 60
+        assert config.daemon_port == 18520
+        assert config.daemon_idle_timeout == 600
 
 
 class TestConfigFromEnv:
