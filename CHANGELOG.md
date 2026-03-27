@@ -8,7 +8,7 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
-## 2026-03-27
+## [0.2.0] - 2026-03-27
 
 ### docs: Gemini CLI 利用ガイドの日本語化
 
