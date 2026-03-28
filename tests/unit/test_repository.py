@@ -188,7 +188,7 @@ class TestDeleteMemory:
         memory_id = repo.save("削除予定の内容", "session-001")
 
         # 削除実行
-        success = repo.delete_memory(memory_id)
+        success = MemoryRepository.delete_memory(initialized_db, memory_id)
         assert success is True
 
         # 各テーブルから消えているか確認
@@ -214,7 +214,6 @@ class TestDeleteMemory:
     def test_delete_returns_false_if_not_existed(
         self, initialized_db: sqlite3.Connection, mock_encoder: MagicMock
     ) -> None:
-        repo = MemoryRepository(initialized_db, mock_encoder)
         # 存在しないID(999)を削除
-        success = repo.delete_memory(999)
+        success = MemoryRepository.delete_memory(initialized_db, 999)
         assert success is False

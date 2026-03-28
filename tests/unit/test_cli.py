@@ -471,7 +471,7 @@ class TestDeleteCommand:
         in_memory_conn: sqlite3.Connection,
         mock_encoder: MagicMock,
     ) -> None:
-        """存在しない ID の場合はエラーメッセージを表示する。"""
+        """存在しない ID の場合はエラーメッセージを表示し、非ゼロで終了する。"""
         import fuga_memory.server as srv
 
         srv._conn = in_memory_conn  # type: ignore[attr-defined]
@@ -480,7 +480,7 @@ class TestDeleteCommand:
         from fuga_memory.cli import main
 
         result = runner.invoke(main, ["delete", "999"])
-        assert result.exit_code == 0
+        assert result.exit_code != 0
         assert "見つかりませんでした" in result.output
 
     def test_delete_id_is_required(self, runner: CliRunner) -> None:

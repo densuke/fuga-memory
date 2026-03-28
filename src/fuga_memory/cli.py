@@ -122,9 +122,10 @@ def delete(memory_id: int) -> None:
         _server.delete_memory(memory_id)
         click.echo(f"ID {memory_id} の記憶を削除しました。")
     except ValueError as exc:
-        click.echo(str(exc))
+        click.echo(str(exc), err=True)
+        sys.exit(1)
     except Exception as exc:
-        click.echo(f"エラーが発生しました: {exc}")
+        raise click.ClickException(f"エラーが発生しました: {exc}") from exc
 
 
 @main.command()

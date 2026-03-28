@@ -98,22 +98,18 @@ class MemoryRepository:
         )
         return [dict(row) for row in cur.fetchall()]
 
-    def delete_memory(self, memory_id: int) -> bool:
+    @classmethod
+    def delete_memory(cls, conn: sqlite3.Connection, memory_id: int) -> bool:
         """指定されたIDの記憶をすべてのテーブルから削除する。削除された場合はTrueを返す。"""
-        with self._conn:
-            # 削除対象が存在するか確認
-            cur = self._conn.execute("SELECT 1 FROM memories WHERE id = ?", (memory_id,))
-            if cur.fetchone() is None:
-                return False
-
+        with conn:
             # memories_vec から削除
-            self._conn.execute("DELETE FROM memories_vec WHERE id = ?", (memory_id,))
+            conn.execute("DELETE FROM memories_vec WHERE id = ?", (memory_id,))
             # memories_fts から削除
-            self._conn.execute("DELETE FROM memories_fts WHERE rowid = ?", (memory_id,))
-            # memories から削除
-            self._conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+            conn.execute("DELETE FROM memories_fts WHERE rowid = ?", (memory_id,))
+            # memories から削除し、削除された行数を確認
+            cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
 
-        return True
+        return cur.rowcount > 0
 
     def _validate_dim(self, vec: list[float], name: str) -> None:
         if len(vec) != self._embedding_dim:
