@@ -49,9 +49,9 @@ def running_daemon(daemon_config: Config) -> Config:
     t = threading.Thread(target=server.start, daemon=True)
     t.start()
 
-    # 起動待ち（最大5秒）
+    # 起動待ち（最大15秒: CI環境は前テストのクリーンアップ後に起動が遅れることがある）
     port = daemon_config.daemon_port
-    deadline = time.monotonic() + 5.0
+    deadline = time.monotonic() + 15.0
     while time.monotonic() < deadline:
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1) as resp:
