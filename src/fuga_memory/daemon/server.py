@@ -15,6 +15,7 @@ import json
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -29,9 +30,12 @@ _WATCHDOG_INTERVAL = 10.0
 # /save エンドポイントが受け付けるコンテンツの最大バイト数（cli.py の _MAX_INPUT_BYTES と統一）
 _MAX_CONTENT_BYTES = 1_048_576  # 1MB
 
+# content フィールドの最大文字数（server.save_memory の _MAX_CONTENT_LENGTH と統一）
+_MAX_CONTENT_LENGTH = 100_000  # 100,000文字
+
 # デーモンプロセス全体でエンコーダを1回だけロードしてキャッシュする。
-# モデル名をキーとし、初回リクエスト時に遅延ロードする。
-_encoder_cache: dict[str, Encoder] = {}
+# (モデル名, スレッド数) をキーとし、初回リクエスト時に遅延ロードする。
+_encoder_cache: dict[tuple[str, int], Encoder] = {}
 _encoder_lock = threading.Lock()
 
 
@@ -39,16 +43,19 @@ def _get_or_load_encoder(model_name: str, thread_workers: int) -> Encoder:
     """エンコーダをキャッシュから返す。未ロードなら ModelLoader でロードしてキャッシュする。
 
     スレッドセーフ（double-checked locking）。
+    キャッシュキーは (model_name, thread_workers) のペアで、
+    thread_workers が異なる設定でも別エンコーダが生成される。
     """
-    if model_name not in _encoder_cache:
+    key = (model_name, thread_workers)
+    if key not in _encoder_cache:
         with _encoder_lock:
-            if model_name not in _encoder_cache:
+            if key not in _encoder_cache:
                 from fuga_memory.embedding.loader import ModelLoader
 
                 loader = ModelLoader(model_name, thread_workers)
-                _encoder_cache[model_name] = loader.get_encoder()
+                _encoder_cache[key] = loader.get_encoder()
                 logger.info("埋め込みモデルのロード完了: %s", model_name)
-    return _encoder_cache[model_name]
+    return _encoder_cache[key]
 
 
 def _do_save_task(content: str, session_id: str, source: str, config: Config) -> None:
@@ -63,11 +70,14 @@ def _do_save_task(content: str, session_id: str, source: str, config: Config) ->
         from fuga_memory.db.schema import initialize_schema
 
         conn = get_connection(config.db_path)
-        initialize_schema(conn, config.embedding_dim)
-        encoder = _get_or_load_encoder(config.model_name, config.thread_workers)
-        repo = MemoryRepository(conn, encoder, config.embedding_dim)
-        repo.save(content, session_id, source)
-        logger.debug("保存完了: session_id=%s source=%s", session_id, source)
+        try:
+            initialize_schema(conn, config.embedding_dim)
+            encoder = _get_or_load_encoder(config.model_name, config.thread_workers)
+            repo = MemoryRepository(conn, encoder, config.embedding_dim)
+            repo.save(content, session_id, source)
+            logger.debug("保存完了: session_id=%s source=%s", session_id, source)
+        finally:
+            conn.close()
     except Exception:
         logger.exception("バックグラウンド保存中にエラーが発生しました")
 
@@ -92,7 +102,11 @@ class DaemonServer:
         _lock: _pending の排他制御。
         _last_request_time: 最後にリクエストを受け付けた時刻（monotonic）。
         _shutdown_event: 終了フラグ。
+        _executor: バックグラウンド保存用スレッドプール（上限付き）。
     """
+
+    # バックグラウンドワーカーの最大スレッド数
+    _SAVE_POOL_MAX_WORKERS = 4
 
     def __init__(self, config: Config, watchdog_interval: float = _WATCHDOG_INTERVAL) -> None:
         self._config = config
@@ -102,6 +116,7 @@ class DaemonServer:
         self._shutdown_event = threading.Event()
         self._httpd: ThreadingHTTPServer | None = None
         self._watchdog_interval = watchdog_interval
+        self._executor = ThreadPoolExecutor(max_workers=self._SAVE_POOL_MAX_WORKERS)
 
         # ログ設定
         # 同一プロセスで複数回 DaemonServer が生成されてもハンドラを重複追加しない
@@ -183,6 +198,18 @@ class DaemonServer:
             _write_json_response(handler, 400, {"error": "content, session_id, source は必須です"})
             return
 
+        # server.save_memory と同等の入力バリデーション
+        if not content:
+            _write_json_response(handler, 400, {"error": "content は空文字列にできません"})
+            return
+        if len(content) > _MAX_CONTENT_LENGTH:
+            _write_json_response(
+                handler,
+                400,
+                {"error": f"content が最大サイズを超えています: {len(content)} > {_MAX_CONTENT_LENGTH}"},
+            )
+            return
+
         # 即座に 202 を返す
         handler.send_response(202)
         handler.send_header("Content-Length", "0")
@@ -204,6 +231,10 @@ class DaemonServer:
             length = int(handler.headers.get("Content-Length", "0"))
         except ValueError as exc:
             _write_json_response(handler, 400, {"error": str(exc)})
+            return None
+
+        if length < 0:
+            _write_json_response(handler, 400, {"error": "Content-Length が不正です"})
             return None
 
         if length > _MAX_CONTENT_BYTES:
@@ -231,7 +262,7 @@ class DaemonServer:
             threading.Thread(target=self._httpd.shutdown, daemon=True).start()
 
     def _submit_save(self, content: str, session_id: str, source: str) -> None:
-        """pending を +1 してスレッドを起動する。完了後に -1 する。"""
+        """pending を +1 してスレッドプールにタスクを投入する。完了後に -1 する。"""
         with self._lock:
             self._pending += 1
 
@@ -242,8 +273,7 @@ class DaemonServer:
                 with self._lock:
                     self._pending -= 1
 
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
+        self._executor.submit(run)
 
     def _watchdog(self) -> None:
         """定期的にアイドルタイムアウトを確認し、条件を満たせばシャットダウンする。"""
