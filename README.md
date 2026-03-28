@@ -15,8 +15,8 @@ Claude Code（および他の LLM）向け長期記憶 MCP サーバー。
 
 ## セットアップガイド
 
-- [Claude Code での設定 (README)](README.md)
-- [Gemini CLI での設定 (GEMINI.md)](GEMINI.md)
+- [Claude Code での設定 (CLAUDE.md)](CLAUDE.md)
+- [Gemini CLI での設定 (docs/gemini-guide.md)](docs/gemini-guide.md)
 
 ---
 
