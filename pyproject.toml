@@ -1,6 +1,6 @@
 [project]
 name = "fuga-memory"
-version = "0.4.0"
+version = "0.4.1"
 description = "Long-term memory MCP server for Claude Code and other LLMs"
 readme = "README.md"
 license = { text = "MIT" }

@@ -135,3 +135,32 @@ class TestSearchFts:
         self._populate(initialized_db, mock_encoder, sample_memories)
         results = search_fts(initialized_db, "の", top_k=top_k)
         assert len(results) <= top_k
+
+    def test_hyphen_in_query_does_not_raise(
+        self,
+        initialized_db: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """ハイフンを含むクエリ（例: "fuga-memory"）でエラーが発生しないこと。
+
+        FTS5 はハイフンを否定演算子として解釈するため、サニタイズが必要。
+        """
+        repo = MemoryRepository(initialized_db, mock_encoder)
+        repo.save("fuga-memory の進捗記録", "session-001")
+
+        # OperationalError が発生しないこと
+        results = search_fts(initialized_db, "fuga-memory 進捗", top_k=5)
+        assert isinstance(results, list)
+
+    def test_hyphen_query_returns_matching_content(
+        self,
+        initialized_db: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """ハイフンを含むクエリでもマッチする記録が返ること。"""
+        repo = MemoryRepository(initialized_db, mock_encoder)
+        repo.save("fuga-memory の進捗記録", "session-001")
+        repo.save("全く関係ない内容", "session-002")
+
+        results = search_fts(initialized_db, "fuga-memory 進捗", top_k=5)
+        assert any("fuga" in r["content"] for r in results)

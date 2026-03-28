@@ -8,6 +8,17 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
+## [0.4.1] - 2026-03-28
+
+### fix: FTS5 検索クエリのハイフン処理
+
+- `search/fts.py`: `_sanitize_fts_query()` でハイフン（`-`）を除去するよう修正
+  - `fuga-memory` のような語中ハイフンが FTS5 の否定演算子として解釈され、
+    `no such column: memory` エラーが発生していた問題を修正
+- `tests/unit/test_search_fts.py`: ハイフンを含むクエリのテストを 2 件追加
+
+---
+
 ## [0.4.0] - 2026-03-28
 
 ### feat: 起動ログ改善・ONNXモデルのローカルキャッシュを実装
