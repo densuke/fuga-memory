@@ -48,8 +48,8 @@ class RuriEncoder:
             return load_cached_model(cache_dir)
 
         try:
-            export_and_cache(model_name, cache_dir)
-            return load_cached_model(cache_dir)
+            # export_and_cache がエクスポート済みモデルを返すので再ロード不要
+            return export_and_cache(model_name, cache_dir)
         except Exception as exc:
             logger.warning("ONNXキャッシュ作成失敗。直接ロードにフォールバック: %s", exc)
             return SentenceTransformer(model_name, backend="onnx")

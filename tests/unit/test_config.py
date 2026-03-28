@@ -383,7 +383,8 @@ class TestConfigOnnxCacheDirField:
 
     def test_onnx_cache_dir_from_toml(self, tmp_path: Path) -> None:
         toml_file = tmp_path / "config.toml"
-        toml_file.write_text(f'[fuga-memory]\nonnx_cache_dir = "{tmp_path}/onnx"\n')
+        # as_posix() でバックスラッシュを避ける（Windows でTOMLパースエラーになるため）
+        toml_file.write_text(f'[fuga-memory]\nonnx_cache_dir = "{tmp_path.as_posix()}/onnx"\n')
         config = Config.load(config_path=toml_file)
         assert "onnx" in config.onnx_cache_dir.as_posix()
 

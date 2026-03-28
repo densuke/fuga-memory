@@ -94,7 +94,8 @@ class TestExportAndCache:
 
         mock_cls.assert_called_once_with("cl-nagoya/ruri-v3-310m", backend="onnx")
         mock_model.save.assert_called_once_with(str(tmp_path))
-        assert result == tmp_path
+        # エクスポートに使ったモデルをそのまま返す（再ロード不要）
+        assert result is mock_model
 
     def test_creates_cache_dir_if_not_exists(self, tmp_path: Path) -> None:
         """キャッシュディレクトリが存在しない場合は作成する。"""

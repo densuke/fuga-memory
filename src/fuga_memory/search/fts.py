@@ -10,7 +10,8 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # FTS5 の特殊構文文字（フレーズ引用符・グルーピング・カラム指定・列指定・範囲等）
-_FTS5_SPECIAL = re.compile(r'["\(\)\*\^\:\.\{\}]')
+# ハイフン "-" は否定演算子として解釈されるため含める
+_FTS5_SPECIAL = re.compile(r'["\(\)\*\^\:\.\{\}\-]')
 
 
 def _sanitize_fts_query(query: str) -> str:

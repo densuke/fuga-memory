@@ -78,8 +78,9 @@ def _read_stdin_limited(max_bytes: int = _MAX_INPUT_BYTES) -> str:
 def main(ctx: click.Context, debug: bool) -> None:
     """fuga-memory: Claude Code 向け長期記憶 MCP サーバー。"""
     ctx.ensure_object(dict)
-    ctx.obj["debug"] = debug
-    if not debug:
+    # CLIフラグと設定ファイル/環境変数（Config.debug）の両方を参照
+    config = Config.load()
+    if not (debug or config.debug):
         suppress_warnings()
 
 
