@@ -158,20 +158,20 @@ class TestSaveEndpoint:
 
         def post_save() -> None:
             try:
-                with patch("fuga_memory.daemon.server._do_save_task"):
-                    status = self._post_save(
-                        port,
-                        {"content": "並行テスト", "session_id": "s1", "source": "manual"},
-                    )
+                status = self._post_save(
+                    port,
+                    {"content": "並行テスト", "session_id": "s1", "source": "manual"},
+                )
                 results.append(status)
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=post_save) for _ in range(5)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=5)
+        with patch("fuga_memory.daemon.server._do_save_task"):
+            threads = [threading.Thread(target=post_save) for _ in range(5)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=5)
 
         assert not errors, f"エラーが発生: {errors}"
         assert all(s == 202 for s in results)
