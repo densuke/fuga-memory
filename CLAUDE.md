@@ -92,12 +92,15 @@ tests/
 
 `~/.claude/settings.json` に追加：
 
+> **注意**: `/path/to/fuga-memory` は fuga-memory をクローンしたディレクトリの絶対パスに置き換えてください（例: `/Users/yourname/src/fuga-memory`）。
+
 ```json
 {
   "mcpServers": {
     "fuga-memory": {
       "command": "uv",
       "args": ["run", "--project", "/path/to/fuga-memory", "fuga-memory", "serve"]
+      //                            ^^^^^^^^^^^^^^^^^^^^ クローン先の絶対パスに変更
     }
   },
   "hooks": {
@@ -107,6 +110,7 @@ tests/
           {
             "type": "command",
             "command": "uv run --project /path/to/fuga-memory fuga-memory save --stdin --session-id \"${CLAUDE_SESSION_ID:-unknown}\" --source claude_code",
+            //                            ^^^^^^^^^^^^^^^^^^^^ 同上
             "timeout": 60
           }
         ]

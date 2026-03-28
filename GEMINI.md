@@ -22,7 +22,7 @@ Gemini CLI の設定ファイル（通常は `~/.gemini/settings.json`）に `fu
       "args": [
         "run",
         "--project",
-        "/path/to/fuga-memory",
+        "/path/to/fuga-memory", // ← クローン先の絶対パスに変更（例: /Users/yourname/src/fuga-memory）
         "fuga-memory",
         "serve"
       ]

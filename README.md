@@ -58,6 +58,7 @@ Stop フックによる自動保存も使う場合は `hooks` セクションを
     "fuga-memory": {
       "command": "uv",
       "args": ["run", "--project", "/path/to/fuga-memory", "fuga-memory", "serve"]
+      //                            ^^^^^^^^^^^^^^^^^^^^ クローン先の絶対パスに変更
     }
   },
   "hooks": {
@@ -67,6 +68,7 @@ Stop フックによる自動保存も使う場合は `hooks` セクションを
           {
             "type": "command",
             "command": "uv run --project /path/to/fuga-memory fuga-memory save --stdin --session-id \"${CLAUDE_SESSION_ID:-unknown}\" --source claude_code",
+            //                            ^^^^^^^^^^^^^^^^^^^^ 同上
             "timeout": 60
           }
         ]
