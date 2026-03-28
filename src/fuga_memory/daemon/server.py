@@ -272,7 +272,14 @@ class DaemonServer:
                 with self._lock:
                     self._pending -= 1
 
-        self._executor.submit(run)
+        try:
+            self._executor.submit(run)
+        except RuntimeError:
+            # Executorがシャットダウン中のためタスクを投入できなかった
+            with self._lock:
+                self._pending -= 1
+            logger.warning("シャットダウン中にタスクが投入されたため、保存はキャンセルされました。")
+
 
     def _watchdog(self) -> None:
         """定期的にアイドルタイムアウトを確認し、条件を満たせばシャットダウンする。"""
