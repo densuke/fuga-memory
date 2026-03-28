@@ -436,6 +436,62 @@ class TestSaveCommandDaemon:
 
 
 # ---------------------------------------------------------------------------
+# delete コマンドのテスト
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteCommand:
+    def test_delete_command_calls_repository_delete(
+        self,
+        runner: CliRunner,
+        in_memory_conn: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """delete コマンドは指定された ID の記憶を削除する。"""
+        import fuga_memory.server as srv
+
+        srv._conn = in_memory_conn  # type: ignore[attr-defined]
+        srv._encoder = mock_encoder  # type: ignore[attr-defined]
+        result_save = srv.save_memory("削除テスト", "s1", "manual")
+        memory_id = result_save["id"]
+
+        from fuga_memory.cli import main
+
+        result = runner.invoke(main, ["delete", str(memory_id)])
+        assert result.exit_code == 0
+        assert "削除しました" in result.output
+
+        # DBからも消えているか確認
+        cur = in_memory_conn.execute("SELECT COUNT(*) FROM memories WHERE id = ?", (memory_id,))
+        assert cur.fetchone()[0] == 0
+
+    def test_delete_command_not_found(
+        self,
+        runner: CliRunner,
+        in_memory_conn: sqlite3.Connection,
+        mock_encoder: MagicMock,
+    ) -> None:
+        """存在しない ID の場合はエラーメッセージを表示し、非ゼロで終了する。"""
+        import fuga_memory.server as srv
+
+        srv._conn = in_memory_conn  # type: ignore[attr-defined]
+        srv._encoder = mock_encoder  # type: ignore[attr-defined]
+
+        from fuga_memory.cli import main
+
+        result = runner.invoke(main, ["delete", "999"])
+        assert result.exit_code != 0
+        assert "見つかりませんでした" in result.output
+
+    def test_delete_id_is_required(self, runner: CliRunner) -> None:
+        """delete コマンドは ID 引数が必須。"""
+        from fuga_memory.cli import main
+
+        result = runner.invoke(main, ["delete"])
+        assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
 # main グループのテスト
 # ---------------------------------------------------------------------------
 

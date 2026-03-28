@@ -179,3 +179,27 @@ def list_sessions(limit: int = 20) -> list[dict[str, Any]]:
         (limit,),
     )
     return [dict(row) for row in cur.fetchall()]
+
+
+@mcp.tool()
+def delete_memory(memory_id: int) -> dict[str, Any]:
+    """記憶を削除する。
+
+    Args:
+        memory_id: 削除する記憶の ID（1 以上）。
+
+    Returns:
+        {"status": "deleted"}
+
+    Raises:
+        ValueError: memory_id が 1 未満の場合、または指定された ID の記憶が見つからない場合。
+    """
+    if memory_id < 1:
+        raise ValueError(f"memory_id は 1 以上である必要があります: {memory_id}")
+
+    conn = _get_conn()
+    # エンコーダのロードを避けるため、静的メソッドを直接呼ぶ
+    if not MemoryRepository.delete_memory(conn, memory_id):
+        logger.warning("delete_memory: ID %d が見つかりませんでした", memory_id)
+        raise ValueError(f"ID {memory_id} の記憶が見つかりませんでした。")
+    return {"status": "deleted"}

@@ -302,6 +302,45 @@ class TestListSessions:
 
 
 # ---------------------------------------------------------------------------
+# delete_memory のテスト
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteMemory:
+    def test_delete_memory_removes_from_db(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """delete_memory は記憶を DB から削除し、{"status": "deleted"} を返す。"""
+        conn = server_deps["conn"]
+        result_save = srv.save_memory("削除テスト内容", "session-001")
+        memory_id = result_save["id"]
+
+        result_delete = srv.delete_memory(memory_id)
+        assert result_delete["status"] == "deleted"
+
+        # DBから消えているか確認
+        row = conn.execute("SELECT COUNT(*) FROM memories WHERE id = ?", (memory_id,)).fetchone()
+        assert row[0] == 0
+
+    def test_delete_memory_not_found_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """存在しない ID を削除しようとすると ValueError を発生させる。"""
+        with pytest.raises(ValueError, match="記憶が見つかりませんでした"):
+            srv.delete_memory(999)
+
+    def test_delete_memory_invalid_id_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """1 未満の ID を削除しようとすると ValueError を発生させる。"""
+        with pytest.raises(ValueError, match="1 以上である必要があります"):
+            srv.delete_memory(0)
+
+
+# ---------------------------------------------------------------------------
 # バリデーション上限値のテスト
 # ---------------------------------------------------------------------------
 

@@ -6,6 +6,22 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ## [Unreleased]
 
+### feat: 記憶の削除機能（delete command/tool）を追加 (#14)
+
+不要な記憶や重複データを整理・枝刈りするための機能を追加しました。AI レビュアー（Gemini/Copilot）の指摘に基づき、パフォーマンスと原子性を最適化しています。
+
+- **リポジトリ層**: `MemoryRepository.delete_memory()` を追加。
+  - エンコーダ不要の `@staticmethod` として実装。
+  - `SELECT` を排し `DELETE` 直後の `rowcount` で判定することで原子性と効率を向上。
+  - `memories`, `memories_fts`, `memories_vec` の 3 テーブルから一貫して削除。
+- **サーバー層 (MCP)**: `delete_memory` ツールを追加。
+  - `memory_id < 1` のバリデーションを追加。
+  - 削除時に重いモデル（エンコーダ）をロードしないように最適化。
+- **CLI層**: `fuga-memory delete <ID>` コマンドを追加。
+  - `memory_id` の入力範囲を 1 以上に制限（`click.IntRange`）。
+  - 削除失敗（見つからない）やエラー時に非ゼロ（exit code 1）で終了し、stderr にエラーを出力するよう改善。
+- **テスト**: 全レイヤーでユニットテストを追加し、マルチプラットフォーム（Windows/Linux/macOS）での動作を検証済み。
+
 ---
 
 ## [0.4.2] - 2026-03-28
