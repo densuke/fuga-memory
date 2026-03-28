@@ -8,6 +8,43 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
+## [0.3.0] - 2026-03-28
+
+### feat: バックグラウンドデーモン経由の非同期 save (#12)
+
+Claude Code の Stop フックで `fuga-memory save --stdin` がブロッキングになる問題を解決するため、
+軽量ローカル HTTP デーモンをバックグラウンド自動起動し、即座に 202 を返す仕組みを実装しました。
+
+#### 新機能
+
+- `src/fuga_memory/daemon/` パッケージを新規追加
+  - `server.py`: `ThreadingHTTPServer` + watchdog（アイドルタイムアウト 10 分で自動停止）
+    - `/save` (POST): 202 即返却、`ThreadPoolExecutor`（max 4 workers）でバックグラウンド処理
+    - `/health` (GET): `{"app": "fuga-memory", "pending": <int>}` を返す
+    - `/shutdown` (POST): graceful shutdown
+    - プロセス内エンコーダキャッシュ（リクエストごとのモデルロードを排除）
+    - `Content-Length` 上限 100,000 バイトのバリデーション
+  - `client.py`: `ensure_daemon_running()` + `send_save_request()`（202 即返）
+  - `_process.py`: クロスプラットフォームでデタッチプロセス起動（Windows/POSIX）
+- `Config` に `daemon_port=18520`、`daemon_idle_timeout=600` を追加
+- `cli.py` の save コマンドをデーモン経由に変更（失敗時は従来の直接実行にフォールバック）
+- CLAUDE.md にデーモン設定例・動作説明・管理コマンドを追記
+
+#### バグ修正
+
+- Windows: `close_fds=True` + DEVNULL リダイレクトの組み合わせが `ValueError` になるバグを修正
+- `initialize_schema` / `MemoryRepository` に `config.embedding_dim` を渡すよう修正
+- FileHandler 重複追加防止（複数回 DaemonServer 生成時の FD リーク解消）
+- `server_close()` を `serve_forever()` 終了後に呼び出し（ソケット即時解放）
+
+#### テスト
+
+- `tests/unit/test_daemon_process.py`、`test_daemon_client.py`、`test_daemon_server.py` を追加
+- `tests/integration/test_daemon_integration.py` を追加
+- CI マトリクスに Windows を追加（クロスプラットフォーム検証）
+
+---
+
 ## [0.2.0] - 2026-03-27
 
 ### docs: Gemini CLI 利用ガイドの日本語化
