@@ -133,9 +133,13 @@ tests/
 [fuga-memory]
 daemon_port = 18520          # デーモンの待ち受けポート（デフォルト: 18520）
 daemon_idle_timeout = 600    # アイドル自動終了までの秒数（デフォルト: 600秒=10分）
+onnx_cache_dir = "~/.local/share/fuga-memory/onnx_cache"  # ONNXキャッシュ先（デフォルト）
+debug = false                # デバッグモード（true でライブラリ警告を抑制しない）
 ```
 
-環境変数: `FUGA_MEMORY_DAEMON_PORT`、`FUGA_MEMORY_DAEMON_IDLE_TIMEOUT`
+環境変数: `FUGA_MEMORY_DAEMON_PORT`、`FUGA_MEMORY_DAEMON_IDLE_TIMEOUT`、`FUGA_MEMORY_ONNX_CACHE_DIR`、`FUGA_MEMORY_DEBUG`
+
+CLIフラグ: `fuga-memory --debug <subcommand>` でデバッグモードを有効化
 
 ### デーモン管理
 

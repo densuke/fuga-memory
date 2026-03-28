@@ -8,6 +8,46 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
+## [0.4.0] - 2026-03-28
+
+### feat: 起動ログ改善・ONNXモデルのローカルキャッシュを実装
+
+初回起動時に大量のライブラリ警告が出力される問題を解決するため、
+警告抑制機構と ONNX モデルのローカルキャッシュ保存を実装しました。
+
+#### Phase 1: 警告抑制・進捗メッセージ
+
+- `src/fuga_memory/warnings.py` を新規追加
+  - `suppress_warnings()`: PyTorch/ONNXRuntime/HuggingFace 系ライブラリの警告を抑制
+  - `is_debug_mode()`: `FUGA_MEMORY_DEBUG` 環境変数でデバッグモード判定
+- `cli.py` に `--debug` フラグを追加（デバッグモード時は警告を抑制しない）
+- `embedding/loader.py` に初回モデルロード時の進捗メッセージを追加
+  - `モデルを初期化中... (初回のみ、数十秒かかります)` を stderr に表示
+- `Config` に `debug` フィールドを追加
+
+#### Phase 2: ONNX モデルキャッシュ
+
+- `src/fuga_memory/embedding/onnx_cache.py` を新規追加
+  - `get_onnx_cache_dir()`: モデル名からキャッシュパスを生成
+  - `is_cached()`: キャッシュ済み ONNX モデルの存在確認
+  - `export_and_cache()`: SentenceTransformer を ONNX 形式でローカルに保存
+  - `load_cached_model()`: キャッシュ済み ONNX モデルを高速ロード
+- `embedding/encoder.py` の `RuriEncoder` に `cache_dir` パラメータを追加
+  - キャッシュあり → 高速ローカルロード
+  - キャッシュなし → エクスポート・保存してからロード
+  - エクスポート失敗時 → 直接ロードにフォールバック
+- `embedding/loader.py` の `ModelLoader` に `cache_dir` パラメータを追加
+- `server.py`・`daemon/server.py` が `onnx_cache_dir` 設定を参照するよう更新
+- `Config` に `onnx_cache_dir` フィールドを追加
+  - デフォルト: `~/.local/share/fuga-memory/onnx_cache`
+  - 設定ファイル: `onnx_cache_dir`
+  - 環境変数: `FUGA_MEMORY_ONNX_CACHE_DIR`
+
+これにより、初回起動時のみ ONNX エクスポート（数十秒）が発生し、
+2回目以降はキャッシュから高速ロードされるようになります。
+
+---
+
 ## [0.3.0] - 2026-03-28
 
 ### feat: バックグラウンドデーモン経由の非同期 save (#12)
