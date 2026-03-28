@@ -152,7 +152,6 @@ class DaemonServer:
             server.server_close()
             logger.info("デーモン停止")
 
-
     def _make_handler(self) -> type[BaseHTTPRequestHandler]:
         """DaemonHandler のクラスを生成する（server インスタンスをクロージャで渡す）。"""
         # BaseHTTPRequestHandler のサブクラス内では self がハンドラインスタンスを指すため、
@@ -280,7 +279,6 @@ class DaemonServer:
             with self._lock:
                 self._pending -= 1
             logger.warning("シャットダウン中にタスクが投入されたため、保存はキャンセルされました。")
-
 
     def _watchdog(self) -> None:
         """定期的にアイドルタイムアウトを確認し、条件を満たせばシャットダウンする。"""
