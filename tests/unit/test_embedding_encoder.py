@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -190,6 +191,81 @@ class TestRuriEncoderEncode:
         args, kwargs = call_args
         passed_text = args[0] if args else kwargs.get("sentences")
         assert passed_text == f"検索文書: {original_text}"
+
+
+class TestRuriEncoderWithCache:
+    def test_init_with_cache_dir_loads_from_cache_when_cached(self, tmp_path: Path) -> None:
+        """cache_dir が指定されキャッシュが存在する場合はキャッシュからロードする。"""
+
+        # キャッシュが存在する状態を作る
+        onnx_dir = tmp_path / "onnx"
+        onnx_dir.mkdir()
+        (onnx_dir / "model.onnx").touch()
+
+        mock_st = MagicMock()
+        with (
+            patch("fuga_memory.embedding.encoder.SentenceTransformer", return_value=mock_st),
+            patch(
+                "fuga_memory.embedding.encoder.load_cached_model", return_value=mock_st
+            ) as mock_load,
+            patch("fuga_memory.embedding.encoder.is_cached", return_value=True),
+        ):
+            from fuga_memory.embedding.encoder import RuriEncoder
+
+            RuriEncoder(model_name="cl-nagoya/ruri-v3-310m", cache_dir=tmp_path)
+
+        mock_load.assert_called_once_with(tmp_path)
+
+    def test_init_with_cache_dir_exports_when_not_cached(self, tmp_path: Path) -> None:
+        """cache_dir が指定されキャッシュがない場合はエクスポートして保存する。"""
+        mock_st = MagicMock()
+        with (
+            patch("fuga_memory.embedding.encoder.SentenceTransformer", return_value=mock_st),
+            patch(
+                "fuga_memory.embedding.encoder.export_and_cache", return_value=tmp_path
+            ) as mock_export,
+            patch("fuga_memory.embedding.encoder.load_cached_model", return_value=mock_st),
+            patch("fuga_memory.embedding.encoder.is_cached", return_value=False),
+        ):
+            from fuga_memory.embedding.encoder import RuriEncoder
+
+            RuriEncoder(model_name="cl-nagoya/ruri-v3-310m", cache_dir=tmp_path)
+
+        mock_export.assert_called_once_with("cl-nagoya/ruri-v3-310m", tmp_path)
+
+    def test_init_without_cache_dir_uses_direct_load(self) -> None:
+        """cache_dir=None の場合は従来どおり SentenceTransformer を直接使う。"""
+        mock_st = MagicMock()
+        with (
+            patch(
+                "fuga_memory.embedding.encoder.SentenceTransformer", return_value=mock_st
+            ) as mock_cls,
+            patch("fuga_memory.embedding.encoder.is_cached") as mock_is_cached,
+        ):
+            from fuga_memory.embedding.encoder import RuriEncoder
+
+            RuriEncoder(model_name="cl-nagoya/ruri-v3-310m", cache_dir=None)
+
+        # is_cached は呼ばれない（キャッシュパスがないので）
+        mock_is_cached.assert_not_called()
+        mock_cls.assert_called_once()
+
+    def test_init_with_cache_dir_falls_back_on_export_failure(self, tmp_path: Path) -> None:
+        """エクスポート失敗時はフォールバックして直接ロードする。"""
+        mock_st = MagicMock()
+        with (
+            patch("fuga_memory.embedding.encoder.SentenceTransformer", return_value=mock_st),
+            patch(
+                "fuga_memory.embedding.encoder.export_and_cache",
+                side_effect=RuntimeError("network error"),
+            ),
+            patch("fuga_memory.embedding.encoder.is_cached", return_value=False),
+        ):
+            from fuga_memory.embedding.encoder import RuriEncoder
+
+            # フォールバックするため例外は出ない
+            encoder = RuriEncoder(model_name="cl-nagoya/ruri-v3-310m", cache_dir=tmp_path)
+            assert encoder is not None
 
 
 class TestRuriEncoderSatisfiesProtocol:

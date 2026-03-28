@@ -64,7 +64,10 @@ def _get_encoder() -> Encoder:
     global _encoder
     if _encoder is None:
         config = _get_config()
-        loader = ModelLoader(config.model_name, config.thread_workers)
+        from fuga_memory.embedding.onnx_cache import get_onnx_cache_dir
+
+        cache_dir = get_onnx_cache_dir(config.model_name, config.onnx_cache_dir)
+        loader = ModelLoader(config.model_name, config.thread_workers, cache_dir=cache_dir)
         _encoder = loader.get_encoder()
     return _encoder
 

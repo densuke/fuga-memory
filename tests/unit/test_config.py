@@ -361,6 +361,37 @@ class TestConfigEnvOverride:
         assert config.daemon_idle_timeout == 600
 
 
+class TestConfigOnnxCacheDirField:
+    """onnx_cache_dir フィールドのテスト。"""
+
+    def _no_file(self, tmp_path: Path) -> Path:
+        return tmp_path / "nonexistent.toml"
+
+    def test_onnx_cache_dir_default_is_under_fuga_memory(self) -> None:
+        config = Config()
+        assert "fuga-memory" in config.onnx_cache_dir.as_posix()
+
+    def test_onnx_cache_dir_default_contains_onnx_cache(self) -> None:
+        config = Config()
+        assert "onnx_cache" in config.onnx_cache_dir.as_posix()
+
+    def test_onnx_cache_dir_from_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        custom = str(tmp_path / "my_onnx_cache")
+        monkeypatch.setenv("FUGA_MEMORY_ONNX_CACHE_DIR", custom)
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.onnx_cache_dir == Path(custom).expanduser().resolve()
+
+    def test_onnx_cache_dir_from_toml(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "config.toml"
+        toml_file.write_text(f'[fuga-memory]\nonnx_cache_dir = "{tmp_path}/onnx"\n')
+        config = Config.load(config_path=toml_file)
+        assert "onnx" in config.onnx_cache_dir.as_posix()
+
+    def test_onnx_cache_dir_returns_path_object(self) -> None:
+        config = Config()
+        assert isinstance(config.onnx_cache_dir, Path)
+
+
 class TestConfigDebugField:
     """debug フィールドのテスト。"""
 

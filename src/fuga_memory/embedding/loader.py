@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
+from pathlib import Path
 
 from fuga_memory.embedding.encoder import Encoder, RuriEncoder
 from fuga_memory.exceptions import ModelLoadError
@@ -20,11 +21,14 @@ class ModelLoader:
     ロードに失敗した場合は次回呼び出しで再試行できる。
     """
 
-    def __init__(self, model_name: str, thread_workers: int = 1) -> None:
+    def __init__(
+        self, model_name: str, thread_workers: int = 1, cache_dir: Path | None = None
+    ) -> None:
         if thread_workers < 1:
             raise ValueError(f"thread_workers は 1 以上である必要があります: {thread_workers}")
         self._model_name = model_name
         self._thread_workers = thread_workers
+        self._cache_dir = cache_dir
         self._encoder: Encoder | None = None
         self._future: Future[Encoder] | None = None
         self._lock = threading.Lock()
@@ -70,7 +74,7 @@ class ModelLoader:
                     flush=True,
                 )
                 executor = ThreadPoolExecutor(max_workers=self._thread_workers)
-                self._future = executor.submit(RuriEncoder, self._model_name)
+                self._future = executor.submit(RuriEncoder, self._model_name, self._cache_dir)
                 executor.shutdown(wait=False)
 
             future = self._future

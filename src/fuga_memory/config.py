@@ -52,6 +52,10 @@ def _default_db_path() -> Path:
     return Path.home() / ".local" / "share" / "fuga-memory" / "memories.db"
 
 
+def _default_onnx_cache_dir() -> Path:
+    return Path.home() / ".local" / "share" / "fuga-memory" / "onnx_cache"
+
+
 def _default_thread_workers() -> int:
     cpu = os.cpu_count() or 2
     return max(1, cpu // 2)
@@ -147,6 +151,8 @@ def _apply_toml(config: Config, path: Path) -> Config:
         updates["daemon_idle_timeout"] = _parse_int(
             values["daemon_idle_timeout"], "daemon_idle_timeout", path, min_val=1
         )
+    if "onnx_cache_dir" in values:
+        updates["onnx_cache_dir"] = Path(str(values["onnx_cache_dir"])).expanduser().resolve()
 
     return replace(config, **updates)
 
@@ -190,6 +196,9 @@ def _apply_env(config: Config) -> Config:
     _parse_env_int(updates, "FUGA_MEMORY_DAEMON_PORT", "daemon_port", min_val=1024, max_val=65535)
     _parse_env_int(updates, "FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "daemon_idle_timeout", min_val=1)
 
+    if onnx_cache_dir_str := os.environ.get("FUGA_MEMORY_ONNX_CACHE_DIR"):
+        updates["onnx_cache_dir"] = Path(onnx_cache_dir_str).expanduser().resolve()
+
     if debug_val := os.environ.get("FUGA_MEMORY_DEBUG"):
         updates["debug"] = debug_val.lower() in _DEBUG_TRUE_VALUES
 
@@ -207,6 +216,7 @@ class Config:
     default_top_k: int = 5
     daemon_port: int = 18520
     daemon_idle_timeout: int = 600
+    onnx_cache_dir: Path = field(default_factory=_default_onnx_cache_dir)
     debug: bool = False
 
     @classmethod

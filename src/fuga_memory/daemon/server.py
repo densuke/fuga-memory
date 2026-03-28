@@ -39,7 +39,7 @@ _encoder_cache: dict[tuple[str, int], Encoder] = {}
 _encoder_lock = threading.Lock()
 
 
-def _get_or_load_encoder(model_name: str, thread_workers: int) -> Encoder:
+def _get_or_load_encoder(model_name: str, thread_workers: int, config: Config) -> Encoder:
     """エンコーダをキャッシュから返す。未ロードなら ModelLoader でロードしてキャッシュする。
 
     スレッドセーフ（double-checked locking）。
@@ -51,8 +51,10 @@ def _get_or_load_encoder(model_name: str, thread_workers: int) -> Encoder:
         with _encoder_lock:
             if key not in _encoder_cache:
                 from fuga_memory.embedding.loader import ModelLoader
+                from fuga_memory.embedding.onnx_cache import get_onnx_cache_dir
 
-                loader = ModelLoader(model_name, thread_workers)
+                cache_dir = get_onnx_cache_dir(model_name, config.onnx_cache_dir)
+                loader = ModelLoader(model_name, thread_workers, cache_dir=cache_dir)
                 _encoder_cache[key] = loader.get_encoder()
                 logger.info("埋め込みモデルのロード完了: %s", model_name)
     return _encoder_cache[key]
@@ -72,7 +74,7 @@ def _do_save_task(content: str, session_id: str, source: str, config: Config) ->
         conn = get_connection(config.db_path)
         try:
             initialize_schema(conn, config.embedding_dim)
-            encoder = _get_or_load_encoder(config.model_name, config.thread_workers)
+            encoder = _get_or_load_encoder(config.model_name, config.thread_workers, config)
             repo = MemoryRepository(conn, encoder, config.embedding_dim)
             repo.save(content, session_id, source)
             logger.debug("保存完了: session_id=%s source=%s", session_id, source)
