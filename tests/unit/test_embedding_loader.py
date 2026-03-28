@@ -185,6 +185,43 @@ class TestModelLoaderGetEncoder:
         assert encoder is mock_encoder
 
 
+class TestModelLoaderProgressMessage:
+    def test_get_encoder_writes_progress_to_stderr(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """初回 get_encoder() 呼び出し時に進捗メッセージが stderr に出力される。"""
+        from fuga_memory.embedding.loader import ModelLoader
+
+        mock_encoder = MagicMock()
+        mock_encoder.encode.return_value = [0.0] * 768
+
+        with patch("fuga_memory.embedding.loader.RuriEncoder", return_value=mock_encoder):
+            loader = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=1)
+            loader.get_encoder()
+
+        captured = capsys.readouterr()
+        assert len(captured.err) > 0
+
+    def test_progress_message_not_repeated_on_second_call(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """2回目以降の get_encoder() では進捗メッセージが出力されない（キャッシュ済み）。"""
+        from fuga_memory.embedding.loader import ModelLoader
+
+        mock_encoder = MagicMock()
+        mock_encoder.encode.return_value = [0.0] * 768
+
+        with patch("fuga_memory.embedding.loader.RuriEncoder", return_value=mock_encoder):
+            loader = ModelLoader(model_name="cl-nagoya/ruri-v3-310m", thread_workers=1)
+            loader.get_encoder()
+            capsys.readouterr()  # 1回目の出力をクリア
+
+            loader.get_encoder()
+            captured = capsys.readouterr()
+
+        assert captured.err == ""  # 2回目は出力なし
+
+
 class TestModelLoaderThreadSafety:
     def test_concurrent_get_encoder_calls_return_same_object(self) -> None:
         """並行して get_encoder() を呼んでも同一オブジェクトが返る。

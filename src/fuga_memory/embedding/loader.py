@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 
@@ -63,6 +64,11 @@ class ModelLoader:
 
             # 進行中の Future を共有して重複ロードを防ぐ
             if self._future is None:
+                print(  # noqa: T201
+                    "モデルを初期化中... (初回のみ、数十秒かかります)",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 executor = ThreadPoolExecutor(max_workers=self._thread_workers)
                 self._future = executor.submit(RuriEncoder, self._model_name)
                 executor.shutdown(wait=False)

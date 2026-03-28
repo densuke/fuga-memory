@@ -361,6 +361,43 @@ class TestConfigEnvOverride:
         assert config.daemon_idle_timeout == 600
 
 
+class TestConfigDebugField:
+    """debug フィールドのテスト。"""
+
+    def _no_file(self, tmp_path: Path) -> Path:
+        return tmp_path / "nonexistent.toml"
+
+    def test_debug_default_is_false(self) -> None:
+        config = Config()
+        assert config.debug is False
+
+    def test_debug_true_from_env_value_1(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DEBUG", "1")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.debug is True
+
+    def test_debug_true_from_env_value_true(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DEBUG", "true")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.debug is True
+
+    def test_debug_false_when_env_not_set(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("FUGA_MEMORY_DEBUG", raising=False)
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.debug is False
+
+    def test_debug_false_for_value_0(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FUGA_MEMORY_DEBUG", "0")
+        config = Config.load(config_path=self._no_file(tmp_path))
+        assert config.debug is False
+
+
 class TestConfigFromEnv:
     """from_env() が環境変数のみを適用し、設定ファイルを読まないことを確認。"""
 

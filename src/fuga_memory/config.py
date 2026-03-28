@@ -22,6 +22,8 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+_DEBUG_TRUE_VALUES = frozenset({"1", "true", "yes"})
+
 # HuggingFace モデルID形式: "org/model-name" または "model-name"
 # ASCII 英数字・ハイフン・アンダースコア・ドット・スラッシュのみ許可（Unicode 除外）
 _MODEL_NAME_PATTERN = re.compile(r"^[\w][\w\-\.]*(/[\w][\w\-\.]*)?$", re.ASCII)
@@ -188,6 +190,9 @@ def _apply_env(config: Config) -> Config:
     _parse_env_int(updates, "FUGA_MEMORY_DAEMON_PORT", "daemon_port", min_val=1024, max_val=65535)
     _parse_env_int(updates, "FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "daemon_idle_timeout", min_val=1)
 
+    if debug_val := os.environ.get("FUGA_MEMORY_DEBUG"):
+        updates["debug"] = debug_val.lower() in _DEBUG_TRUE_VALUES
+
     return replace(config, **updates)
 
 
@@ -202,6 +207,7 @@ class Config:
     default_top_k: int = 5
     daemon_port: int = 18520
     daemon_idle_timeout: int = 600
+    debug: bool = False
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> Config:

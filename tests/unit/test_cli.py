@@ -440,6 +440,39 @@ class TestSaveCommandDaemon:
 # ---------------------------------------------------------------------------
 
 
+class TestDebugOption:
+    def test_debug_flag_appears_in_help(self, runner: CliRunner) -> None:
+        """--debug オプションがヘルプに表示される。"""
+        from fuga_memory.cli import main
+
+        result = runner.invoke(main, ["--help"])
+        assert "--debug" in result.output
+
+    def test_suppress_warnings_called_without_debug(self, runner: CliRunner) -> None:
+        """--debug なしでは suppress_warnings() が呼ばれる。"""
+        from fuga_memory.cli import main
+
+        with (
+            patch("fuga_memory.cli.suppress_warnings") as mock_suppress,
+            patch("fuga_memory.server.mcp") as mock_mcp,
+        ):
+            mock_mcp.run.return_value = None
+            runner.invoke(main, ["serve"])
+        mock_suppress.assert_called_once()
+
+    def test_suppress_warnings_not_called_with_debug(self, runner: CliRunner) -> None:
+        """--debug ありでは suppress_warnings() が呼ばれない。"""
+        from fuga_memory.cli import main
+
+        with (
+            patch("fuga_memory.cli.suppress_warnings") as mock_suppress,
+            patch("fuga_memory.server.mcp") as mock_mcp,
+        ):
+            mock_mcp.run.return_value = None
+            runner.invoke(main, ["--debug", "serve"])
+        mock_suppress.assert_not_called()
+
+
 class TestMainGroup:
     def test_main_help(self, runner: CliRunner) -> None:
         """main --help は正常終了する。"""

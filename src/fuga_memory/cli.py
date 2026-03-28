@@ -18,6 +18,7 @@ import click
 from fuga_memory import server as _server
 from fuga_memory.config import Config
 from fuga_memory.daemon.client import send_save_request
+from fuga_memory.warnings import suppress_warnings
 
 
 def _to_localtime(utc_str: str) -> str:
@@ -67,8 +68,19 @@ def _read_stdin_limited(max_bytes: int = _MAX_INPUT_BYTES) -> str:
 
 
 @click.group()
-def main() -> None:
+@click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="デバッグモード（ライブラリ警告を抑制しない）。",
+)
+@click.pass_context
+def main(ctx: click.Context, debug: bool) -> None:
     """fuga-memory: Claude Code 向け長期記憶 MCP サーバー。"""
+    ctx.ensure_object(dict)
+    ctx.obj["debug"] = debug
+    if not debug:
+        suppress_warnings()
 
 
 @main.command()
