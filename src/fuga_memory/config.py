@@ -91,7 +91,13 @@ def _parse_toml_file(path: Path) -> dict[str, object]:
     return {k: v for k, v in data.items() if not isinstance(v, dict)}
 
 
-def _parse_int(value: object, key: str, path: Path, min_val: int | None = None) -> int:
+def _parse_int(
+    value: object,
+    key: str,
+    path: Path,
+    min_val: int | None = None,
+    max_val: int | None = None,
+) -> int:
     """TOML 値を int に変換する。失敗・範囲外時はキー名とファイルパスを含むエラーを出す。"""
     try:
         result = int(str(value))
@@ -102,6 +108,10 @@ def _parse_int(value: object, key: str, path: Path, min_val: int | None = None) 
     if min_val is not None and result < min_val:
         raise ValueError(
             f"設定ファイル '{path}' の '{key}' は {min_val} 以上である必要があります: {result}"
+        )
+    if max_val is not None and result > max_val:
+        raise ValueError(
+            f"設定ファイル '{path}' の '{key}' は {max_val} 以下である必要があります: {result}"
         )
     return result
 
@@ -127,12 +137,24 @@ def _apply_toml(config: Config, path: Path) -> Config:
         )
     if "default_top_k" in values:
         updates["default_top_k"] = _parse_int(values["default_top_k"], "default_top_k", path)
+    if "daemon_port" in values:
+        updates["daemon_port"] = _parse_int(
+            values["daemon_port"], "daemon_port", path, min_val=1024, max_val=65535
+        )
+    if "daemon_idle_timeout" in values:
+        updates["daemon_idle_timeout"] = _parse_int(
+            values["daemon_idle_timeout"], "daemon_idle_timeout", path, min_val=1
+        )
 
     return replace(config, **updates)
 
 
 def _parse_env_int(
-    updates: dict[str, Any], var_name: str, field_name: str, min_val: int | None = None
+    updates: dict[str, Any],
+    var_name: str,
+    field_name: str,
+    min_val: int | None = None,
+    max_val: int | None = None,
 ) -> None:
     """環境変数を整数として読み込み updates に追加する。未設定時は何もしない。"""
     if val_str := os.environ.get(var_name):
@@ -144,6 +166,8 @@ def _parse_env_int(
             ) from exc
         if min_val is not None and val < min_val:
             raise ValueError(f"{var_name} は {min_val} 以上である必要があります: {val}")
+        if max_val is not None and val > max_val:
+            raise ValueError(f"{var_name} は {max_val} 以下である必要があります: {val}")
         updates[field_name] = val
 
 
@@ -161,6 +185,8 @@ def _apply_env(config: Config) -> Config:
     _parse_env_int(updates, "FUGA_MEMORY_RRF_K", "rrf_k", min_val=0)
     _parse_env_int(updates, "FUGA_MEMORY_DECAY_HALFLIFE_DAYS", "decay_halflife_days", min_val=1)
     _parse_env_int(updates, "FUGA_MEMORY_DEFAULT_TOP_K", "default_top_k")
+    _parse_env_int(updates, "FUGA_MEMORY_DAEMON_PORT", "daemon_port", min_val=1024, max_val=65535)
+    _parse_env_int(updates, "FUGA_MEMORY_DAEMON_IDLE_TIMEOUT", "daemon_idle_timeout", min_val=1)
 
     return replace(config, **updates)
 
@@ -174,6 +200,8 @@ class Config:
     rrf_k: int = 60
     decay_halflife_days: int = 30
     default_top_k: int = 5
+    daemon_port: int = 18520
+    daemon_idle_timeout: int = 600
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> Config:
