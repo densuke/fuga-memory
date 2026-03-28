@@ -115,7 +115,7 @@ def search(query: str, top_k: int) -> None:
 
 
 @main.command()
-@click.argument("memory_id", type=int)
+@click.argument("memory_id", type=click.IntRange(min=1))
 def delete(memory_id: int) -> None:
     """記憶を削除する。"""
     try:

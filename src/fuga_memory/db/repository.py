@@ -98,8 +98,8 @@ class MemoryRepository:
         )
         return [dict(row) for row in cur.fetchall()]
 
-    @classmethod
-    def delete_memory(cls, conn: sqlite3.Connection, memory_id: int) -> bool:
+    @staticmethod
+    def delete_memory(conn: sqlite3.Connection, memory_id: int) -> bool:
         """指定されたIDの記憶をすべてのテーブルから削除する。削除された場合はTrueを返す。"""
         with conn:
             # memories_vec から削除

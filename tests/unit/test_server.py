@@ -331,6 +331,14 @@ class TestDeleteMemory:
         with pytest.raises(ValueError, match="記憶が見つかりませんでした"):
             srv.delete_memory(999)
 
+    def test_delete_memory_invalid_id_raises(
+        self,
+        server_deps: dict[str, Any],
+    ) -> None:
+        """1 未満の ID を削除しようとすると ValueError を発生させる。"""
+        with pytest.raises(ValueError, match="1 以上である必要があります"):
+            srv.delete_memory(0)
+
 
 # ---------------------------------------------------------------------------
 # バリデーション上限値のテスト
