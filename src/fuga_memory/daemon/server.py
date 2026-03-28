@@ -145,6 +145,7 @@ class DaemonServer:
 
         logger.info("デーモン起動: port=%d", self._config.daemon_port)
         try:
+            server.serve_forever()
         finally:
             logger.info("デーモン停止処理を開始します...")
             self._executor.shutdown(wait=True)
