@@ -49,13 +49,15 @@ src/fuga_memory/
 ├── cli.py          # CLIエントリーポイント（click）
 ├── server.py       # MCPサーバー定義（fastmcp）
 ├── config.py       # 設定（DBパス、モデル名、スレッド数等）
+├── warnings.py     # ライブラリ警告抑制ユーティリティ
 ├── db/
 │   ├── connection.py   # SQLite接続管理（WAL、sqlite-vec拡張）
 │   ├── schema.py       # DDL（memoriesテーブル、FTS5、vec仮想テーブル）
 │   └── repository.py   # CRUD操作
 ├── embedding/
-│   ├── loader.py   # バックグラウンドモデルロード
-│   └── encoder.py  # テキスト→768次元ベクトル
+│   ├── loader.py       # バックグラウンドモデルロード
+│   ├── encoder.py      # テキスト→768次元ベクトル
+│   └── onnx_cache.py   # ONNXモデルのローカルキャッシュ管理
 └── search/
     ├── fts.py      # FTS5検索
     ├── vector.py   # ベクトル検索
@@ -104,8 +106,8 @@ tests/
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --project /path/to/fuga-memory fuga-memory save --stdin --session-id \"${sessionId}\"",
-            "timeout": 30
+            "command": "uv run --project /path/to/fuga-memory fuga-memory save --stdin --session-id \"${CLAUDE_SESSION_ID:-unknown}\" --source claude_code",
+            "timeout": 60
           }
         ]
       }

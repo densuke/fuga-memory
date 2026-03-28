@@ -8,6 +8,24 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ---
 
+## [0.4.2] - 2026-03-28
+
+### docs: ドキュメント更新（v0.4.0/v0.4.1 の変更を反映）
+
+- `CLAUDE.md`: ディレクトリ構造に `warnings.py`・`embedding/onnx_cache.py` を追加
+- `CLAUDE.md`: Stop フックのコマンドを README に合わせて統一
+  - `${sessionId}` → `${CLAUDE_SESSION_ID:-unknown}`
+  - timeout 30 → 60
+  - `--source claude_code` を追加
+- `README.md`: 環境変数表に v0.4.0 追加分を補完
+  - `FUGA_MEMORY_DAEMON_PORT`、`FUGA_MEMORY_DAEMON_IDLE_TIMEOUT`
+  - `FUGA_MEMORY_ONNX_CACHE_DIR`、`FUGA_MEMORY_DEBUG`
+- `README.md`: CLI リファレンスに `--debug` フラグの使用例を追加
+- `README.md`: データの場所テーブルに ONNX キャッシュパスを追加
+- `README.md`: 初回起動の説明を更新（ONNX キャッシュで2回目以降が高速になった旨）
+
+---
+
 ## [0.4.1] - 2026-03-28
 
 ### fix: FTS5 検索クエリのハイフン処理

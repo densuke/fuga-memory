@@ -30,7 +30,7 @@ cd fuga-memory
 uv sync
 ```
 
-> **初回起動時**: ruri-v3-310m モデルを自動ダウンロードします（約 600MB）。ダウンロードはバックグラウンドで行われ、完了まで最初の保存・検索リクエストがブロックされます。
+> **初回起動時**: ruri-v3-310m モデルを自動ダウンロードし ONNX 形式に変換します（約 600MB・数十秒）。変換済みモデルは `~/.local/share/fuga-memory/onnx_cache/` にキャッシュされるため、2回目以降は高速に起動します。
 
 ### 2. 設定ファイルを配置（任意）
 
@@ -164,6 +164,7 @@ MCP 経由ではなく、コマンドラインから直接操作できます。
 
 ```bash
 uv run fuga-memory serve
+uv run fuga-memory --debug serve   # ライブラリ警告を抑制しないデバッグモード
 ```
 
 通常は手動で起動する必要はありません。Claude Code が自動で管理します。
@@ -234,6 +235,10 @@ default_top_k = 10
 | `FUGA_MEMORY_RRF_K` | `60` | RRF の k パラメータ |
 | `FUGA_MEMORY_DECAY_HALFLIFE_DAYS` | `30` | 時間減衰の半減期（日） |
 | `FUGA_MEMORY_DEFAULT_TOP_K` | `5` | デフォルト検索件数 |
+| `FUGA_MEMORY_DAEMON_PORT` | `18520` | デーモンの待ち受けポート |
+| `FUGA_MEMORY_DAEMON_IDLE_TIMEOUT` | `600` | デーモンのアイドル自動終了（秒） |
+| `FUGA_MEMORY_ONNX_CACHE_DIR` | `~/.local/share/fuga-memory/onnx_cache` | ONNX キャッシュディレクトリ |
+| `FUGA_MEMORY_DEBUG` | `false` | デバッグモード（警告を抑制しない） |
 
 詳細は `.env.example` を参照してください。
 
@@ -250,6 +255,7 @@ default_top_k = 10
 | 項目 | デフォルトパス |
 |------|--------------|
 | DB ファイル | `~/.local/share/fuga-memory/memories.db` |
+| ONNX キャッシュ | `~/.local/share/fuga-memory/onnx_cache/` |
 | モデルキャッシュ | `~/.cache/huggingface/` |
 
 DB ファイルは SQLite 単一ファイルです。バックアップは `cp memories.db memories.db.bak` で行えます。
