@@ -115,6 +115,19 @@ def search(query: str, top_k: int) -> None:
 
 
 @main.command()
+@click.argument("memory_id", type=int)
+def delete(memory_id: int) -> None:
+    """記憶を削除する。"""
+    try:
+        _server.delete_memory(memory_id)
+        click.echo(f"ID {memory_id} の記憶を削除しました。")
+    except ValueError as exc:
+        click.echo(str(exc))
+    except Exception as exc:
+        click.echo(f"エラーが発生しました: {exc}")
+
+
+@main.command()
 @click.argument("content", required=False)
 @click.option("--session-id", required=True, help="セッション識別子。")
 @click.option(
