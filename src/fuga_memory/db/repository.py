@@ -108,8 +108,7 @@ class MemoryRepository:
             conn.execute("DELETE FROM memories_fts WHERE rowid = ?", (memory_id,))
             # memories から削除し、削除された行数を確認
             cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-
-        return cur.rowcount > 0
+            return cur.rowcount > 0
 
     def _validate_dim(self, vec: list[float], name: str) -> None:
         if len(vec) != self._embedding_dim:
