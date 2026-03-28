@@ -132,9 +132,12 @@ class TestDaemonSaveIntegration:
             from fuga_memory.db.schema import initialize_schema
 
             conn = get_connection(config.db_path)
-            initialize_schema(conn)
-            repo = MemoryRepository(conn, _MockEncoder())
-            repo.save(content, session_id, source)
+            try:
+                initialize_schema(conn)
+                repo = MemoryRepository(conn, _MockEncoder())
+                repo.save(content, session_id, source)
+            finally:
+                conn.close()
 
         db_path = running_daemon.db_path
         row = None
