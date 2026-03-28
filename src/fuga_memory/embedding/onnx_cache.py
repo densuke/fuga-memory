@@ -43,15 +43,18 @@ def is_cached(cache_dir: Path) -> bool:
     return (cache_dir / _ONNX_MODEL_FILE).is_file()
 
 
-def export_and_cache(model_name: str, cache_dir: Path) -> Path:
+def export_and_cache(model_name: str, cache_dir: Path) -> SentenceTransformer:
     """SentenceTransformerモデルをONNX形式でエクスポートしてキャッシュに保存する。
+
+    エクスポートに使ったモデルをそのまま返すことで、呼び出し元が再ロードせずに
+    そのまま利用できる（初回起動時の二重ロードを回避）。
 
     Args:
         model_name: HuggingFace モデルID
         cache_dir: 保存先ディレクトリ（存在しない場合は作成する）
 
     Returns:
-        保存先ディレクトリパス（= cache_dir）
+        エクスポート済みの SentenceTransformer モデル。
 
     Raises:
         Exception: モデルのダウンロードやエクスポートに失敗した場合
@@ -59,7 +62,7 @@ def export_and_cache(model_name: str, cache_dir: Path) -> Path:
     cache_dir.mkdir(parents=True, exist_ok=True)
     model = SentenceTransformer(model_name, backend="onnx")
     model.save(str(cache_dir))
-    return cache_dir
+    return model
 
 
 def load_cached_model(cache_dir: Path) -> SentenceTransformer:

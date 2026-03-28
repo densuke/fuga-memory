@@ -449,11 +449,16 @@ class TestDebugOption:
         assert "--debug" in result.output
 
     def test_suppress_warnings_called_without_debug(self, runner: CliRunner) -> None:
-        """--debug なしでは suppress_warnings() が呼ばれる。"""
+        """--debug なしかつ config.debug=False では suppress_warnings() が呼ばれる。"""
         from fuga_memory.cli import main
+        from fuga_memory.config import Config
+
+        mock_config = MagicMock(spec=Config)
+        mock_config.debug = False
 
         with (
             patch("fuga_memory.cli.suppress_warnings") as mock_suppress,
+            patch("fuga_memory.cli.Config.load", return_value=mock_config),
             patch("fuga_memory.server.mcp") as mock_mcp,
         ):
             mock_mcp.run.return_value = None
@@ -463,13 +468,35 @@ class TestDebugOption:
     def test_suppress_warnings_not_called_with_debug(self, runner: CliRunner) -> None:
         """--debug ありでは suppress_warnings() が呼ばれない。"""
         from fuga_memory.cli import main
+        from fuga_memory.config import Config
+
+        mock_config = MagicMock(spec=Config)
+        mock_config.debug = False
 
         with (
             patch("fuga_memory.cli.suppress_warnings") as mock_suppress,
+            patch("fuga_memory.cli.Config.load", return_value=mock_config),
             patch("fuga_memory.server.mcp") as mock_mcp,
         ):
             mock_mcp.run.return_value = None
             runner.invoke(main, ["--debug", "serve"])
+        mock_suppress.assert_not_called()
+
+    def test_suppress_warnings_not_called_when_config_debug_true(self, runner: CliRunner) -> None:
+        """config.debug=True のとき suppress_warnings() が呼ばれない。"""
+        from fuga_memory.cli import main
+        from fuga_memory.config import Config
+
+        mock_config = MagicMock(spec=Config)
+        mock_config.debug = True
+
+        with (
+            patch("fuga_memory.cli.suppress_warnings") as mock_suppress,
+            patch("fuga_memory.cli.Config.load", return_value=mock_config),
+            patch("fuga_memory.server.mcp") as mock_mcp,
+        ):
+            mock_mcp.run.return_value = None
+            runner.invoke(main, ["serve"])
         mock_suppress.assert_not_called()
 
 
