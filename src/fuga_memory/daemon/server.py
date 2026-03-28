@@ -203,11 +203,8 @@ class DaemonServer:
             _write_json_response(handler, 400, {"error": "content は空文字列にできません"})
             return
         if len(content) > _MAX_CONTENT_LENGTH:
-            _write_json_response(
-                handler,
-                400,
-                {"error": f"content が最大サイズを超えています: {len(content)} > {_MAX_CONTENT_LENGTH}"},
-            )
+            msg = f"content が最大サイズを超えています: {len(content)} > {_MAX_CONTENT_LENGTH}"
+            _write_json_response(handler, 400, {"error": msg})
             return
 
         # 即座に 202 を返す
