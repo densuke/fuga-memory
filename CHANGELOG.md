@@ -6,6 +6,10 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
 
 ## [Unreleased]
 
+---
+
+## [0.4.3] - 2026-03-29
+
 ### feat: 記憶の削除機能（delete command/tool）を追加 (#14)
 
 不要な記憶や重複データを整理・枝刈りするための機能を追加しました。AI レビュアー（Gemini/Copilot）の指摘に基づき、パフォーマンスと原子性を最適化しています。
@@ -21,6 +25,16 @@ fuga-memory の更新履歴です。[Semantic Versioning](https://semver.org/lan
   - `memory_id` の入力範囲を 1 以上に制限（`click.IntRange`）。
   - 削除失敗（見つからない）やエラー時に非ゼロ（exit code 1）で終了し、stderr にエラーを出力するよう改善。
 - **テスト**: 全レイヤーでユニットテストを追加し、マルチプラットフォーム（Windows/Linux/macOS）での動作を検証済み。
+
+### docs: エージェント共通指針（AGENTS.md）の導入とドキュメント整理 (#15)
+
+複数の LLM エージェント（Claude Code, Gemini CLI, Copilot CLI 等）が共存する環境に合わせ、開発指針を一本化しました。
+
+- **AGENTS.md**: 全エージェント共通の技術ルール（スタック、コマンド、規約等）を新規作成。
+- **CLAUDE.md / GEMINI.md**: 技術詳細は `AGENTS.md` を参照するようリファクタリングし、エージェント特有の設定のみを保持。
+- **.github/copilot-instructions.md**: Copilot 向けのプロジェクト指示ファイルを追加。
+- **docs/gemini-guide.md**: 従来のユーザー向けガイドを整理して移設。
+- AI レビューに基づき、JSON サンプルの適正化や Lint コマンドの明示、リンクの改善を実施。
 
 ---
 
