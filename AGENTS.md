@@ -22,7 +22,7 @@ uv run pytest
 
 # Lint
 uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+uv run ruff format --check src/ tests/
 
 # 型チェック
 uv run mypy src/

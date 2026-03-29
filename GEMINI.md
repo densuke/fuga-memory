@@ -8,4 +8,4 @@
 
 ## ユーザーガイド
 
-Gemini CLI を使って本プロジェクトを操作・設定する方法については、**`docs/gemini-guide.md`** を参照してください。
+Gemini CLI を使って本プロジェクトを操作・設定する方法については、[`docs/gemini-guide.md`](docs/gemini-guide.md) を参照してください。
