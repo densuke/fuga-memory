@@ -24,6 +24,9 @@ uv run pytest
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 
+# フォーマット実行
+uv run ruff format src/ tests/
+
 # 型チェック
 uv run mypy src/
 
